@@ -30,14 +30,15 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // Refresh the auth token
+  // Refresh the auth token — this is what persists the session
   await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
 
-  // Allow public paths
+  // Allow public paths without auth check
   if (
     pathname === '/login' ||
+    pathname === '/auth/callback' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.includes('.')
@@ -51,7 +52,12 @@ export async function proxy(request: NextRequest) {
   if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
-    return NextResponse.redirect(loginUrl);
+    // Use supabaseResponse (which has cookies) as base for the redirect
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    supabaseResponse.cookies.getAll().forEach(({ name, value }) =>
+      redirectResponse.cookies.set(name, value)
+    );
+    return redirectResponse;
   }
 
   return supabaseResponse;
