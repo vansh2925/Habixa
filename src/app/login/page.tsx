@@ -11,8 +11,6 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, loading: authLoading, signInWithOtp } = useAuth();
   const configured = isSupabaseConfigured();
-  const urlSet = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project'));
-  const keySet = !!(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes('your-anon'));
 
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,14 +58,9 @@ export default function LoginPage() {
               <Flame className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">HabitFlow</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
               Authentication is not configured yet. Set up Supabase to enable login.
             </p>
-            <div className="text-left bg-gray-50 dark:bg-gray-800 rounded-lg p-3 mb-6 text-xs space-y-1">
-              <p className="text-gray-500">Config status:</p>
-              <p className={urlSet ? 'text-[#22C55E]' : 'text-[#EF4444]'}>URL: {urlSet ? '✓ Set' : '✗ Missing'}</p>
-              <p className={keySet ? 'text-[#22C55E]' : 'text-[#EF4444]'}>Anon Key: {keySet ? '✓ Set' : '✗ Missing'}</p>
-            </div>
             <a
               href="/"
               className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-[#4F6BED] text-white text-sm font-medium rounded-lg hover:bg-[#3D57D9] transition-colors"
