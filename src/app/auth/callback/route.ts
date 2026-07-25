@@ -11,18 +11,27 @@ export async function GET(request: Request) {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (url && key) {
+      const supabaseResponse = NextResponse.redirect(`${origin}${next}`);
+
       const supabase = createServerClient(url, key, {
         cookies: {
           getAll() {
-            return [];
+            return request.headers.get('cookie')?.split(';').map(c => {
+              const [name, ...rest] = c.trim().split('=');
+              return { name, value: rest.join('=') };
+            }) || [];
           },
-          setAll() {},
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options)
+            );
+          },
         },
       });
 
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
-        return NextResponse.redirect(`${origin}${next}`);
+        return supabaseResponse;
       }
     }
   }
