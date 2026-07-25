@@ -50,14 +50,19 @@ export function useAuth(): AuthState & {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithOtp({ email });
       if (error) {
+        // Supabase errors are class instances — manually extract properties
+        const parts: string[] = [];
+        if (error.message) parts.push(error.message);
+        if ((error as Record<string, unknown>).code) parts.push(String((error as Record<string, unknown>).code));
+        if ((error as Record<string, unknown>).status) parts.push(String((error as Record<string, unknown>).status));
+        const errStr = parts.join(' | ') || 'Failed to send magic link';
         console.error('Supabase signIn error:', error);
-        return { error: error.message || JSON.stringify(error) || 'Failed to send magic link' };
+        return { error: errStr };
       }
       return {};
     } catch (e: unknown) {
       console.error('signInWithOtp catch:', e);
       if (e instanceof Error) return { error: e.message };
-      if (typeof e === 'object' && e !== null) return { error: JSON.stringify(e) };
       return { error: String(e) };
     }
   }, [configured]);
