@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // If Supabase is not configured, skip auth entirely
-  if (!url || !key || !url.includes('.supabase.co') || !key.startsWith('eyJ')) {
+  if (!url || !key || url.includes('your-project-ref') || url.includes('xxxxx') || key.includes('your-anon-key')) {
     return NextResponse.next();
   }
 

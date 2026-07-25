@@ -12,7 +12,7 @@ export function createClient(): SupabaseClient {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
-    throw new Error('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local');
+    throw new Error('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel environment variables.');
   }
 
   client = createBrowserClient(url, key);
@@ -22,5 +22,9 @@ export function createClient(): SupabaseClient {
 export function isSupabaseConfigured(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return !!(url && key && url.includes('.supabase.co') && key.startsWith('eyJ'));
+  // Check that values exist and are not placeholders
+  if (!url || !key) return false;
+  if (url.includes('your-project-ref') || url.includes('xxxxx')) return false;
+  if (key.includes('your-anon-key')) return false;
+  return true;
 }

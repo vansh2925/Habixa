@@ -45,10 +45,20 @@ export function useAuth(): AuthState & {
   }, [configured]);
 
   const signInWithOtp = useCallback(async (email: string): Promise<{ error?: string }> => {
-    if (!configured) return { error: 'Supabase not configured' };
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    return { error: error?.message };
+    if (!configured) return { error: 'Supabase not configured. Add env vars in Vercel.' };
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOtp({ email });
+      if (error) {
+        console.error('Supabase signIn error:', error);
+        return { error: error.message || 'Failed to send magic link' };
+      }
+      return {};
+    } catch (e: unknown) {
+      console.error('signInWithOtp catch:', e);
+      const msg = e instanceof Error ? e.message : 'Something went wrong. Check console for details.';
+      return { error: msg };
+    }
   }, [configured]);
 
   const verifyOtp = useCallback(async (email: string, token: string): Promise<{ error?: string; success?: boolean }> => {
