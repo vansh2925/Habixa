@@ -51,13 +51,14 @@ export function useAuth(): AuthState & {
       const { data, error } = await supabase.auth.signInWithOtp({ email });
       if (error) {
         console.error('Supabase signIn error:', error);
-        return { error: error.message || 'Failed to send magic link' };
+        return { error: error.message || JSON.stringify(error) || 'Failed to send magic link' };
       }
       return {};
     } catch (e: unknown) {
       console.error('signInWithOtp catch:', e);
-      const msg = e instanceof Error ? e.message : 'Something went wrong. Check console for details.';
-      return { error: msg };
+      if (e instanceof Error) return { error: e.message };
+      if (typeof e === 'object' && e !== null) return { error: JSON.stringify(e) };
+      return { error: String(e) };
     }
   }, [configured]);
 
