@@ -1,12 +1,14 @@
 'use client';
 
 import { useHabitStore } from '@/store/habit-store';
+import { useAuth } from '@/hooks/use-auth';
 import { getMonthName } from '@/lib/date-utils';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Header() {
   const { currentYear, currentMonth, nextMonth, prevMonth, viewMode } = useHabitStore();
+  const { user, isConfigured } = useAuth();
 
   const pageTitle: Record<string, string> = {
     dashboard: 'Dashboard',
@@ -57,12 +59,19 @@ export function Header() {
           </div>
         </div>
 
-        {/* Right: today indicator */}
+        {/* Right: today indicator + user badge */}
         <div className="flex items-center gap-3">
           <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse" />
             Today
           </div>
+          {isConfigured && user && (
+            <div className="w-8 h-8 rounded-full bg-[#4F6BED] flex items-center justify-center" title={user.email || ''}>
+              <span className="text-xs font-semibold text-white">
+                {user.email?.charAt(0).toUpperCase() || '?'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -2,9 +2,10 @@
 
 import { useRef, useState } from 'react';
 import { useHabitStore } from '@/store/habit-store';
+import { useAuth } from '@/hooks/use-auth';
 import { MONTHS } from '@/lib/constants';
 import { motion } from 'framer-motion';
-import { Download, Upload, Trash2, Moon, Sun, Palette, Calendar, Database, AlertTriangle } from 'lucide-react';
+import { Download, Upload, Trash2, Moon, Sun, Palette, Calendar, Database, AlertTriangle, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function SettingsView() {
@@ -14,6 +15,7 @@ export function SettingsView() {
     exportAllData, importAllData, resetData,
     habits, entries
   } = useHabitStore();
+  const { user, isConfigured, signOut } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -62,6 +64,44 @@ export function SettingsView() {
           Configure your habit tracker
         </p>
       </div>
+
+      {/* Account section */}
+      {isConfigured && user && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+        >
+          <div className="px-5 py-4 border-b border-gray-50 dark:border-gray-800">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-[#4F6BED]" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Account</h3>
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-[#4F6BED] flex items-center justify-center">
+                <span className="text-lg font-semibold text-white">
+                  {user.email?.charAt(0).toUpperCase() || '?'}
+                </span>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Member since {new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+              <button
+                onClick={signOut}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#EF4444] bg-[#EF4444]/10 rounded-lg hover:bg-[#EF4444]/20 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Appearance */}
       <motion.div

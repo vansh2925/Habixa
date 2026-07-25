@@ -1,6 +1,7 @@
 'use client';
 
 import { useHabitStore } from '@/store/habit-store';
+import { useAuth } from '@/hooks/use-auth';
 import { ViewMode } from '@/types';
 import {
   LayoutDashboard,
@@ -18,6 +19,7 @@ import {
   Grid3x3,
   Users,
   Brain,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +52,7 @@ const navGroups = [
 
 export function Sidebar() {
   const { viewMode, setViewMode, isDark, toggleDark, sidebarOpen, setSidebarOpen } = useHabitStore();
+  const { user, isConfigured, signOut } = useAuth();
 
   return (
     <>
@@ -121,6 +124,28 @@ export function Sidebar() {
         {/* Theme + Settings */}
         <div className="px-3 pb-4 flex-shrink-0">
           <div className="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-0.5">
+            {/* User profile */}
+            {isConfigured && user && (
+              <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
+                <div className="w-8 h-8 rounded-full bg-[#4F6BED]/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-semibold text-[#4F6BED]">
+                    {user.email?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
+                    {user.email}
+                  </p>
+                </div>
+                <button
+                  onClick={signOut}
+                  className="p-1.5 rounded-md text-gray-400 hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors"
+                  title="Sign out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             <button
               onClick={() => {
                 setViewMode('settings');
