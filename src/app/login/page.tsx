@@ -4,20 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
-import { Flame, ArrowLeft, Mail, KeyRound, Loader2, CheckCircle2 } from 'lucide-react';
+import { Flame, Mail, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading: authLoading, signInWithOtp, verifyOtp } = useAuth();
+  const { user, loading: authLoading, signInWithOtp } = useAuth();
   const configured = isSupabaseConfigured();
 
-  const [step, setStep] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [sent, setSent] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -26,10 +24,9 @@ export default function LoginPage() {
     }
   }, [user, authLoading, router]);
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
     if (!email.trim()) {
       setError('Please enter your email address');
@@ -43,28 +40,7 @@ export default function LoginPage() {
     if (result.error) {
       setError(result.error);
     } else {
-      setSuccess('OTP sent! Check your email inbox.');
-      setStep('otp');
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!otp.trim() || otp.trim().length !== 6) {
-      setError('Please enter the 6-digit code');
-      return;
-    }
-
-    setLoading(true);
-    const result = await verifyOtp(email.trim(), otp.trim());
-    setLoading(false);
-
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.push('/');
+      setSent(true);
     }
   };
 
@@ -121,15 +97,14 @@ export default function LoginPage() {
             </div>
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white">HabitFlow</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {step === 'email' ? 'Sign in to your account' : 'Enter the code sent to your email'}
+              {sent ? 'Check your email' : 'Sign in with your email'}
             </p>
           </div>
 
-          {/* Error/Success messages */}
-          <AnimatePresence mode="wait">
+          {/* Error */}
+          <AnimatePresence>
             {error && (
               <motion.div
-                key="error"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -138,28 +113,16 @@ export default function LoginPage() {
                 {error}
               </motion.div>
             )}
-            {success && step === 'otp' && (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-4 p-3 bg-[#22C55E]/10 border border-[#22C55E]/20 rounded-lg text-sm text-[#22C55E] flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                {success}
-              </motion.div>
-            )}
           </AnimatePresence>
 
           <AnimatePresence mode="wait">
-            {step === 'email' ? (
+            {!sent ? (
               <motion.form
                 key="email-form"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                onSubmit={handleSendOtp}
+                onSubmit={handleSendMagicLink}
                 className="space-y-4"
               >
                 <div>
@@ -187,66 +150,52 @@ export default function LoginPage() {
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <>Send OTP Code</>
+                    <>Send Magic Link</>
                   )}
                 </button>
               </motion.form>
             ) : (
-              <motion.form
-                key="otp-form"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleVerifyOtp}
-                className="space-y-4"
+              <motion.div
+                key="sent-confirmation"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center space-y-4"
               >
+                <div className="w-16 h-16 mx-auto rounded-full bg-[#22C55E]/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8 text-[#22C55E]" />
+                </div>
+
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
-                    Verification code
-                  </label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="000000"
-                      maxLength={6}
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50 focus:border-[#4F6BED] text-center text-2xl tracking-[0.5em] font-mono"
-                      autoFocus
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    Sent to <span className="font-medium text-gray-600 dark:text-gray-300">{email}</span>
+                  <p className="text-sm text-gray-700 dark:text-gray-200 mb-1">
+                    We sent a sign-in link to
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {email}
                   </p>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading || otp.length !== 6}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#4F6BED] text-white text-sm font-medium rounded-lg hover:bg-[#3D57D9] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>Verify & Sign In</>
-                  )}
-                </button>
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Click the link in the email to sign in. The link expires in 5 minutes.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-1 text-xs text-gray-400">
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Check your spam folder if you don&apos;t see it</span>
+                </div>
 
                 <button
-                  type="button"
                   onClick={() => {
-                    setStep('email');
-                    setOtp('');
+                    setSent(false);
+                    setEmail('');
                     setError('');
-                    setSuccess('');
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  className="text-sm text-[#4F6BED] hover:text-[#3D57D9] font-medium transition-colors"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  Back to email
+                  Try a different email
                 </button>
-              </motion.form>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
