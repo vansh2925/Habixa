@@ -53,8 +53,9 @@ export function useAuth(): AuthState & {
         // Supabase errors are class instances — manually extract properties
         const parts: string[] = [];
         if (error.message) parts.push(error.message);
-        if ((error as Record<string, unknown>).code) parts.push(String((error as Record<string, unknown>).code));
-        if ((error as Record<string, unknown>).status) parts.push(String((error as Record<string, unknown>).status));
+        const raw = error as unknown as Record<string, unknown>;
+        if (raw.code) parts.push(String(raw.code));
+        if (raw.status) parts.push(String(raw.status));
         const errStr = parts.join(' | ') || 'Failed to send magic link';
         console.error('Supabase signIn error:', error);
         return { error: errStr };
