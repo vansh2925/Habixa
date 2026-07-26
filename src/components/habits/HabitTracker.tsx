@@ -18,7 +18,7 @@ export function HabitTracker() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('general');
-  const [newGoal, setNewGoal] = useState(30);
+  const [newGoal, setNewGoal] = useState(daysInMonth);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
 
   const handleAdd = () => {
@@ -26,7 +26,7 @@ export function HabitTracker() {
       addHabit(newName.trim(), newCategory, newGoal);
       setNewName('');
       setNewCategory('general');
-      setNewGoal(30);
+      setNewGoal(daysInMonth);
       setShowAddForm(false);
     }
   };
