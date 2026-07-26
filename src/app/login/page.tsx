@@ -1,28 +1,25 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import {
-  Flame, Mail, KeyRound, Loader2, CheckCircle2,
-  Shield, ArrowRight, ArrowLeft, Zap, BarChart3
+  Flame, Mail, Loader2, CheckCircle2,
+  Shield, ArrowRight, Zap, BarChart3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading: authLoading, signInWithOtp, verifyOtp } = useAuth();
+  const { user, loading: authLoading, signInWithOtp } = useAuth();
   const configured = isSupabaseConfigured();
-  const otpInputRef = useRef<HTMLInputElement>(null);
 
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [sent, setSent] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [resendTimer, setResendTimer] = useState(0);
 
   // Load remember me preference
   useEffect(() => {
@@ -30,27 +27,25 @@ export default function LoginPage() {
     if (saved !== null) setRememberMe(saved !== 'false');
   }, []);
 
-  // Auto-focus OTP input when step changes
+  // If "Remember Me" is unchecked, sign out on browser close
   useEffect(() => {
-    if (step === 'otp') {
-      setTimeout(() => otpInputRef.current?.focus(), 100);
-    }
-  }, [step]);
-
-  // Resend countdown
-  useEffect(() => {
-    if (resendTimer <= 0) return;
-    const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [resendTimer]);
+    if (!configured || rememberMe) return;
+    const handleBeforeUnload = () => {
+      try {
+        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/logout`;
+        navigator.sendBeacon(url);
+      } catch { /* silent */ }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [configured, rememberMe]);
 
   // Redirect if already logged in
   useEffect(() => {
     if (!authLoading && user) router.push('/');
   }, [user, authLoading, router]);
 
-  // Handle send OTP
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!email.trim()) { setError('Please enter your email address'); return; }
@@ -62,42 +57,10 @@ export default function LoginPage() {
     if (result.error) {
       setError(result.error);
     } else {
-      setStep('otp');
-      setResendTimer(60);
+      setSent(true);
     }
   };
 
-  // Handle verify OTP
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!otp.trim() || otp.trim().length !== 6) {
-      setError('Please enter the 6-digit code');
-      return;
-    }
-
-    setLoading(true);
-    const result = await verifyOtp(email.trim(), otp.trim());
-    setLoading(false);
-
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.push('/');
-    }
-  };
-
-  // Handle resend
-  const handleResend = async () => {
-    setError('');
-    setOtp('');
-    setLoading(true);
-    const result = await signInWithOtp(email.trim());
-    setLoading(false);
-    if (!result.error) setResendTimer(60);
-  };
-
-  // Toggle remember me
   const toggleRememberMe = () => {
     const newValue = !rememberMe;
     setRememberMe(newValue);
@@ -138,20 +101,14 @@ export default function LoginPage() {
         <div className="flex-1 flex items-center justify-center p-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[400px]">
             <div className="lg:hidden flex items-center gap-2.5 mb-8">
-              <div className="w-9 h-9 rounded-lg bg-[#4F6BED] flex items-center justify-center">
-                <Flame className="w-5 h-5 text-white" />
-              </div>
+              <div className="w-9 h-9 rounded-lg bg-[#4F6BED] flex items-center justify-center"><Flame className="w-5 h-5 text-white" /></div>
               <span className="font-semibold text-gray-900 dark:text-white">HabitFlow</span>
             </div>
             <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-100 dark:border-gray-800 p-8 text-center">
-              <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-6 h-6 text-gray-400" />
-              </div>
+              <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4"><Mail className="w-6 h-6 text-gray-400" /></div>
               <h1 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Setup Required</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Connect Supabase to enable authentication.</p>
-              <a href="/" className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-[#4F6BED] text-white text-sm font-medium rounded-lg hover:bg-[#3D57D9] transition-colors">
-                Continue without sign-in
-              </a>
+              <a href="/" className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-[#4F6BED] text-white text-sm font-medium rounded-lg hover:bg-[#3D57D9] transition-colors">Continue without sign-in</a>
             </div>
           </motion.div>
         </div>
@@ -209,15 +166,14 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-6">
-            {/* Header */}
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {step === 'otp' ? 'Enter verification code' : 'Welcome back'}
+                {sent ? 'Check your email' : 'Welcome back'}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {step === 'otp'
-                  ? <>We sent a 6-digit code to <span className="font-medium text-gray-700 dark:text-gray-200">{email}</span></>
-                  : 'Enter your email to receive a verification code'}
+                {sent
+                  ? 'We sent a sign-in link to your inbox'
+                  : 'Enter your email to receive a sign-in link'}
               </p>
             </div>
 
@@ -236,20 +192,17 @@ export default function LoginPage() {
             </AnimatePresence>
 
             <AnimatePresence mode="wait">
-              {step === 'email' ? (
-                /* Step 1: Email */
+              {!sent ? (
                 <motion.form
-                  key="email-step"
+                  key="email-form"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  onSubmit={handleSendOtp}
+                  onSubmit={handleSendLink}
                   className="space-y-4"
                 >
                   <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
-                      Email address
-                    </label>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Email address</label>
                     <div className="relative">
                       <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -266,9 +219,7 @@ export default function LoginPage() {
                   {/* Remember Me */}
                   <button type="button" onClick={toggleRememberMe} className="flex items-center gap-2.5 group">
                     <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-all duration-150 ${
-                      rememberMe
-                        ? 'bg-[#4F6BED] border-[#4F6BED]'
-                        : 'border-gray-300 dark:border-gray-600 group-hover:border-[#4F6BED]/50'
+                      rememberMe ? 'bg-[#4F6BED] border-[#4F6BED]' : 'border-gray-300 dark:border-gray-600 group-hover:border-[#4F6BED]/50'
                     }`}>
                       {rememberMe && (
                         <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -284,82 +235,58 @@ export default function LoginPage() {
                     disabled={loading}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#4F6BED] text-white text-sm font-semibold rounded-xl hover:bg-[#3D57D9] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-[#4F6BED]/20"
                   >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Send verification code <ArrowRight className="w-4 h-4" /></>}
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Send sign-in link <ArrowRight className="w-4 h-4" /></>}
                   </button>
 
                   <p className="text-center text-xs text-gray-400 dark:text-gray-500 pt-1">
-                    No password needed. We&apos;ll send you a one-time code.
+                    No password needed. We&apos;ll email you a link.
                   </p>
                 </motion.form>
               ) : (
-                /* Step 2: OTP */
-                <motion.form
-                  key="otp-step"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  onSubmit={handleVerifyOtp}
-                  className="space-y-4"
+                <motion.div
+                  key="sent-confirmation"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="space-y-5"
                 >
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
-                      Verification code
-                    </label>
+                  <div className="flex justify-center">
                     <div className="relative">
-                      <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        ref={otpInputRef}
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="000000"
-                        maxLength={6}
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50 focus:border-[#4F6BED] transition-all text-center text-2xl tracking-[0.5em] font-mono"
-                      />
+                      <div className="w-20 h-20 rounded-full bg-[#22C55E]/10 flex items-center justify-center">
+                        <CheckCircle2 className="w-10 h-10 text-[#22C55E]" />
+                      </div>
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.3, type: 'spring' }}
+                        className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-white dark:bg-[#1a1a1a] border-2 border-[#22C55E] flex items-center justify-center"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-[#22C55E]" />
+                      </motion.div>
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || otp.length !== 6}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#4F6BED] text-white text-sm font-semibold rounded-xl hover:bg-[#3D57D9] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-[#4F6BED]/20"
-                  >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Verify & Sign In <ArrowRight className="w-4 h-4" /></>}
-                  </button>
-
-                  {/* Resend */}
                   <div className="text-center">
-                    {resendTimer > 0 ? (
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        Resend code in {resendTimer}s
-                      </p>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleResend}
-                        disabled={loading}
-                        className="text-xs text-[#4F6BED] hover:text-[#3D57D9] font-medium transition-colors"
-                      >
-                        Resend code
-                      </button>
-                    )}
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">We sent a sign-in link to</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{email}</p>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                      Click the link in the email to sign in. The link expires in 5 minutes.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+                    <span>Check your spam folder if you don&apos;t see it</span>
                   </div>
 
                   <button
-                    type="button"
-                    onClick={() => {
-                      setStep('email');
-                      setOtp('');
-                      setError('');
-                    }}
-                    className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors py-1"
+                    onClick={() => { setSent(false); setEmail(''); setError(''); }}
+                    className="w-full text-sm text-[#4F6BED] hover:text-[#3D57D9] font-medium transition-colors py-2"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    Change email
+                    Try a different email
                   </button>
-                </motion.form>
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
