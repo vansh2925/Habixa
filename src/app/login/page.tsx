@@ -71,8 +71,8 @@ export default function LoginPage() {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!otp.trim() || otp.trim().length < 6) {
-      setError('Please enter the verification code');
+    if (!otp.trim() || otp.trim().length !== 6) {
+      setError('Please enter the 6-digit code');
       return;
     }
 
@@ -314,8 +314,8 @@ export default function LoginPage() {
                         pattern="[0-9]*"
                         value={otp}
                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="Enter code"
-                        maxLength={8}
+                        placeholder="000000"
+                        maxLength={6}
                         className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50 focus:border-[#4F6BED] transition-all text-center text-2xl tracking-[0.5em] font-mono"
                       />
                     </div>
@@ -323,7 +323,7 @@ export default function LoginPage() {
 
                   <button
                     type="submit"
-                    disabled={loading || otp.length < 6}
+                    disabled={loading || otp.length !== 6}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#4F6BED] text-white text-sm font-semibold rounded-xl hover:bg-[#3D57D9] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-[#4F6BED]/20"
                   >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Verify & Sign In <ArrowRight className="w-4 h-4" /></>}
