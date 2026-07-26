@@ -5,13 +5,228 @@ import { useHabitStore } from '@/store/habit-store';
 import { getActiveHabits, isHabitCompletedOnDate } from '@/lib/calculations';
 import { getDaysInMonth, formatDateKey } from '@/lib/date-utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, GripVertical, Check, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CATEGORIES } from '@/lib/constants';
 import { Habit } from '@/types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Sortable habit row component
+function SortableHabitRow({
+  habit,
+  daysInMonth,
+  currentYear,
+  currentMonth,
+  entries,
+  toggleEntry,
+  weekRanges,
+}: {
+  habit: Habit;
+  daysInMonth: number;
+  currentYear: number;
+  currentMonth: number;
+  entries: any[];
+  toggleEntry: (habitId: string, date: string) => void;
+  weekRanges: { start: number; end: number; label: string }[];
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: habit.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  let completedDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if (isHabitCompletedOnDate(entries, habit.id, dateStr)) {
+      completedDays++;
+    }
+  }
+  const progress = habit.goalDays > 0 ? completedDays / habit.goalDays : 0;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'group hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors border-b border-gray-50 dark:border-gray-800/50',
+        isDragging && 'opacity-50 bg-[#4F6BED]/5 z-50'
+      )}
+    >
+      <div className="flex items-center">
+        {/* Drag handle + Habit name */}
+        <div className="w-[200px] min-w-[200px] px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors flex-shrink-0 touch-none"
+              title="Drag to reorder"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </button>
+            <div
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: CATEGORIES.find(c => c.id === habit.category)?.color || '#6B7280' }}
+            />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+              {habit.name}
+            </span>
+          </div>
+        </div>
+
+        {/* Day toggles */}
+        <div className="flex-1 flex">
+          {weekRanges.map((week, wi) => (
+            <div key={wi} className="flex-1 border-l border-gray-100 dark:border-gray-800 flex">
+              {Array.from({ length: week.end - week.start + 1 }, (_, di) => {
+                const day = week.start + di;
+                const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const completed = isHabitCompletedOnDate(entries, habit.id, dateStr);
+                const isToday = formatDateKey(new Date()) === dateStr;
+
+                return (
+                  <button
+                    key={day}
+                    onClick={() => toggleEntry(habit.id, dateStr)}
+                    className={cn(
+                      'flex-1 h-8 flex items-center justify-center transition-all duration-150',
+                      isToday && 'bg-[#4F6BED]/5',
+                      completed
+                        ? 'bg-[#22C55E]/10 hover:bg-[#22C55E]/20'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                    )}
+                  >
+                    {completed && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      >
+                        <Check className="w-3 h-3 text-[#22C55E]" strokeWidth={3} />
+                      </motion.div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Completion count */}
+        <div className="w-[80px] min-w-[80px] px-2 py-2.5 text-center border-l border-gray-100 dark:border-gray-800">
+          <span className={cn(
+            'text-sm font-semibold',
+            progress >= 0.8 ? 'text-[#22C55E]' :
+            progress >= 0.5 ? 'text-[#F59E0B]' :
+            'text-gray-400'
+          )}>
+            {completedDays}/{habit.goalDays}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sortable manage row
+function SortableManageRow({
+  habit,
+  toggleHabitActive,
+  deleteHabit,
+}: {
+  habit: Habit;
+  toggleHabitActive: (id: string) => void;
+  deleteHabit: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `manage-${habit.id}` });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex items-center gap-3 px-5 py-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors border-b border-gray-50 dark:border-gray-800/50',
+        isDragging && 'opacity-50 bg-[#4F6BED]/5 z-50'
+      )}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors touch-none"
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
+      <div
+        className="w-2 h-2 rounded-full flex-shrink-0"
+        style={{ backgroundColor: CATEGORIES.find(c => c.id === habit.category)?.color || '#6B7280' }}
+      />
+      <span className={cn(
+        'flex-1 text-sm font-medium',
+        habit.isActive ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'
+      )}>
+        {habit.name}
+      </span>
+      <span className="text-xs text-gray-400">{habit.goalDays}d goal</span>
+      <button
+        onClick={() => toggleHabitActive(habit.id)}
+        className={cn(
+          'px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
+          habit.isActive
+            ? 'bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+        )}
+      >
+        {habit.isActive ? 'Active' : 'Inactive'}
+      </button>
+      <button
+        onClick={() => deleteHabit(habit.id)}
+        className="p-1.5 rounded-md text-gray-400 hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
 
 export function HabitTracker() {
-  const { habits, entries, currentYear, currentMonth, toggleEntry, addHabit, deleteHabit, updateHabit, toggleHabitActive } = useHabitStore();
+  const { habits, entries, currentYear, currentMonth, toggleEntry, addHabit, deleteHabit, toggleHabitActive, reorderHabits } = useHabitStore();
   const activeHabits = getActiveHabits(habits);
   const daysInMonth = getDaysInMonth(new Date(currentYear, currentMonth - 1));
 
@@ -19,7 +234,17 @@ export function HabitTracker() {
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('general');
   const [newGoal, setNewGoal] = useState(daysInMonth);
-  const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const weekRanges: { start: number; end: number; label: string }[] = [];
+  for (let i = 1; i <= daysInMonth; i += 7) {
+    const end = Math.min(i + 6, daysInMonth);
+    weekRanges.push({ start: i, end, label: `W${weekRanges.length + 1}` });
+  }
 
   const handleAdd = () => {
     if (newName.trim()) {
@@ -31,15 +256,33 @@ export function HabitTracker() {
     }
   };
 
-  const weekRanges: { start: number; end: number; label: string }[] = [];
-  for (let i = 1; i <= daysInMonth; i += 7) {
-    const end = Math.min(i + 6, daysInMonth);
-    weekRanges.push({
-      start: i,
-      end,
-      label: `W${weekRanges.length + 1}`,
-    });
-  }
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = activeHabits.findIndex(h => h.id === active.id);
+    const newIndex = activeHabits.findIndex(h => h.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(activeHabits, oldIndex, newIndex);
+    reorderHabits(newOrder.map(h => h.id));
+  };
+
+  const handleManageDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = String(active.id).replace('manage-', '');
+    const overId = String(over.id).replace('manage-', '');
+    if (activeId === overId) return;
+
+    const oldIndex = habits.findIndex(h => h.id === activeId);
+    const newIndex = habits.findIndex(h => h.id === overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(habits, oldIndex, newIndex);
+    reorderHabits(newOrder.map(h => h.id));
+  };
 
   return (
     <div className="space-y-4">
@@ -48,7 +291,7 @@ export function HabitTracker() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Habit Tracker</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {activeHabits.length} active habits
+            {activeHabits.length} active habits · Drag to reorder
           </p>
         </div>
         <button
@@ -109,7 +352,7 @@ export function HabitTracker() {
         )}
       </AnimatePresence>
 
-      {/* Tracker grid */}
+      {/* Tracker grid with drag and drop */}
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         {/* Week headers */}
         <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
@@ -140,96 +383,23 @@ export function HabitTracker() {
           </div>
         </div>
 
-        {/* Habit rows */}
-        <div className="divide-y divide-gray-50 dark:divide-gray-800/50">
-          <AnimatePresence>
-            {activeHabits.map((habit, hi) => {
-              let completedDays = 0;
-              for (let d = 1; d <= daysInMonth; d++) {
-                const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                if (isHabitCompletedOnDate(entries, habit.id, dateStr)) {
-                  completedDays++;
-                }
-              }
-              const progress = habit.goalDays > 0 ? completedDays / habit.goalDays : 0;
-
-              return (
-                <motion.div
-                  key={habit.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors"
-                >
-                  <div className="flex items-center">
-                    {/* Habit name */}
-                    <div className="w-[200px] min-w-[200px] px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: CATEGORIES.find(c => c.id === habit.category)?.color || '#6B7280' }}
-                        />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-                          {habit.name}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Day toggles */}
-                    <div className="flex-1 flex">
-                      {weekRanges.map((week, wi) => (
-                        <div key={wi} className="flex-1 border-l border-gray-100 dark:border-gray-800 flex">
-                          {Array.from({ length: week.end - week.start + 1 }, (_, di) => {
-                            const day = week.start + di;
-                            const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                            const completed = isHabitCompletedOnDate(entries, habit.id, dateStr);
-                            const isToday = formatDateKey(new Date()) === dateStr;
-
-                            return (
-                              <button
-                                key={day}
-                                onClick={() => toggleEntry(habit.id, dateStr)}
-                                className={cn(
-                                  'flex-1 h-8 flex items-center justify-center transition-all duration-150',
-                                  isToday && 'bg-[#4F6BED]/5',
-                                  completed
-                                    ? 'bg-[#22C55E]/10 hover:bg-[#22C55E]/20'
-                                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                                )}
-                              >
-                                {completed && (
-                                  <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                  >
-                                    <Check className="w-3 h-3 text-[#22C55E]" strokeWidth={3} />
-                                  </motion.div>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Completion count */}
-                    <div className="w-[80px] min-w-[80px] px-2 py-2.5 text-center border-l border-gray-100 dark:border-gray-800">
-                      <span className={cn(
-                        'text-sm font-semibold',
-                        progress >= 0.8 ? 'text-[#22C55E]' :
-                        progress >= 0.5 ? 'text-[#F59E0B]' :
-                        'text-gray-400'
-                      )}>
-                        {completedDays}/{habit.goalDays}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
+        {/* Habit rows with drag and drop */}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={activeHabits.map(h => h.id)} strategy={verticalListSortingStrategy}>
+            {activeHabits.map((habit) => (
+              <SortableHabitRow
+                key={habit.id}
+                habit={habit}
+                daysInMonth={daysInMonth}
+                currentYear={currentYear}
+                currentMonth={currentMonth}
+                entries={entries}
+                toggleEntry={toggleEntry}
+                weekRanges={weekRanges}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {activeHabits.length === 0 && (
           <div className="py-12 text-center text-sm text-gray-400">
@@ -238,45 +408,24 @@ export function HabitTracker() {
         )}
       </div>
 
-      {/* Manage habits */}
+      {/* Manage habits with drag and drop */}
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-50 dark:border-gray-800">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Manage Habits</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Drag to reorder</p>
         </div>
-        <div className="divide-y divide-gray-50 dark:divide-gray-800/50">
-          {habits.map(habit => (
-            <div key={habit.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
-              <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: CATEGORIES.find(c => c.id === habit.category)?.color || '#6B7280' }}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleManageDragEnd}>
+          <SortableContext items={habits.map(h => `manage-${h.id}`)} strategy={verticalListSortingStrategy}>
+            {habits.map(habit => (
+              <SortableManageRow
+                key={habit.id}
+                habit={habit}
+                toggleHabitActive={toggleHabitActive}
+                deleteHabit={deleteHabit}
               />
-              <span className={cn(
-                'flex-1 text-sm font-medium',
-                habit.isActive ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'
-              )}>
-                {habit.name}
-              </span>
-              <span className="text-xs text-gray-400">{habit.goalDays}d goal</span>
-              <button
-                onClick={() => toggleHabitActive(habit.id)}
-                className={cn(
-                  'px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
-                  habit.isActive
-                    ? 'bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
-                )}
-              >
-                {habit.isActive ? 'Active' : 'Inactive'}
-              </button>
-              <button
-                onClick={() => deleteHabit(habit.id)}
-                className="p-1.5 rounded-md text-gray-400 hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );
