@@ -38,7 +38,6 @@ export async function proxy(request: NextRequest) {
   // Allow public paths without auth check
   if (
     pathname === '/login' ||
-    pathname === '/auth/callback' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.includes('.')

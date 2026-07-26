@@ -56,7 +56,7 @@ export function useAuth(): AuthState & {
         const raw = error as unknown as Record<string, unknown>;
         if (raw.code) parts.push(String(raw.code));
         if (raw.status) parts.push(String(raw.status));
-        const errStr = parts.join(' | ') || 'Failed to send magic link';
+        const errStr = parts.join(' | ') || 'Failed to send OTP code';
         console.error('Supabase signIn error:', error);
         return { error: errStr };
       }
