@@ -76,7 +76,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
               <Flame className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white font-semibold text-lg">HabitFlow</span>
+            <span className="text-white font-semibold text-lg">HabiXa</span>
           </div>
           <div className="space-y-8">
             <div>
@@ -96,13 +96,13 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
-          <p className="text-white/40 text-xs">© 2026 HabitFlow. All rights reserved.</p>
+          <p className="text-white/40 text-xs">© 2026 HabiXa. All rights reserved.</p>
         </div>
         <div className="flex-1 flex items-center justify-center p-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[400px]">
             <div className="lg:hidden flex items-center gap-2.5 mb-8">
               <div className="w-9 h-9 rounded-lg bg-[#4F6BED] flex items-center justify-center"><Flame className="w-5 h-5 text-white" /></div>
-              <span className="font-semibold text-gray-900 dark:text-white">HabitFlow</span>
+              <span className="font-semibold text-gray-900 dark:text-white">HabiXa</span>
             </div>
             <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-100 dark:border-gray-800 p-8 text-center">
               <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4"><Mail className="w-6 h-6 text-gray-400" /></div>
@@ -132,7 +132,7 @@ export default function LoginPage() {
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
             <Flame className="w-5 h-5 text-white" />
           </div>
-          <span className="text-white font-semibold text-lg">HabitFlow</span>
+          <span className="text-white font-semibold text-lg">HabiXa</span>
         </div>
         <div className="space-y-8">
           <div>
@@ -152,7 +152,7 @@ export default function LoginPage() {
             ))}
           </div>
         </div>
-        <p className="text-white/40 text-xs">© 2026 HabitFlow. All rights reserved.</p>
+        <p className="text-white/40 text-xs">© 2026 HabiXa. All rights reserved.</p>
       </div>
 
       {/* Right form */}
@@ -162,7 +162,7 @@ export default function LoginPage() {
             <div className="w-9 h-9 rounded-lg bg-[#4F6BED] flex items-center justify-center">
               <Flame className="w-5 h-5 text-white" />
             </div>
-            <span className="font-semibold text-gray-900 dark:text-white">HabitFlow</span>
+            <span className="font-semibold text-gray-900 dark:text-white">HabiXa</span>
           </div>
 
           <div className="space-y-6">

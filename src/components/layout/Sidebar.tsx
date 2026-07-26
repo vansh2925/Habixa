@@ -79,7 +79,7 @@ export function Sidebar() {
               <Flame className="w-4.5 h-4.5 text-white" />
             </div>
             <span className="font-semibold text-[15px] text-gray-900 dark:text-white tracking-tight">
-              HabitFlow
+              HabiXa
             </span>
           </div>
           <button

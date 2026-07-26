@@ -45,12 +45,12 @@ export function SocialAccountability() {
   }, []);
 
   const generateShareText = () => {
-    return `🔥 HabitFlow Progress — ${getMonthName(currentMonth)} ${currentYear}\n\n` +
+    return `🔥 HabiXa Progress — ${getMonthName(currentMonth)} ${currentYear}\n\n` +
       `📊 Completion: ${Math.round(completionRate * 100)}%\n` +
       `🔥 Current Streak: ${streak.current} days\n` +
       `✅ ${totalCompleted} habits completed\n` +
       `📈 This Week: ${Math.round(weeklyPercentage * 100)}%\n\n` +
-      `#HabitFlow #HabitTracker`;
+      `#HabiXa #HabitTracker`;
   };
 
   const handleCopyProgress = () => {
@@ -62,7 +62,7 @@ export function SocialAccountability() {
   const handleShareNative = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'My HabitFlow Progress',
+        title: 'My HabiXa Progress',
         text: generateShareText(),
       });
     } else {
@@ -220,7 +220,7 @@ export function SocialAccountability() {
             <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
               <Flame className="w-4 h-4" />
             </div>
-            <span className="font-semibold text-sm">HabitFlow</span>
+            <span className="font-semibold text-sm">HabiXa</span>
           </div>
           <div className="grid grid-cols-3 gap-3 mb-3">
             <div className="bg-white/10 rounded-lg p-2 text-center">

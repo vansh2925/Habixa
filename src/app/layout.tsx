@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "HabitFlow - Habit Tracker",
+  title: "HabiXa - Habit Tracker",
   description: "A premium habit tracking application",
 };
 
