@@ -84,6 +84,8 @@ export function useAuth(): AuthState & {
     if (!configured) return;
     const supabase = createClient();
     await supabase.auth.signOut();
+    localStorage.removeItem('habitflow-remember-me');
+    window.location.href = '/login';
   }, [configured]);
 
   return { user, loading, isConfigured: configured, signInWithOtp, verifyOtp, signOut };
