@@ -3,9 +3,10 @@ import { Habit, HabitEntry, ViewMode } from '@/types';
 import { loadHabits, saveHabits, loadEntries, saveEntries, loadTheme, saveTheme } from '@/lib/storage';
 import { generateId } from '@/lib/calculations';
 import { getCurrentYear, getCurrentMonth } from '@/lib/date-utils';
+import { isSupabaseConfigured, createClient } from '@/lib/supabase/client';
+import { fetchHabits, upsertHabits, deleteHabit as deleteHabitDb, fetchEntries, upsertEntries, deleteEntriesByHabit } from '@/lib/supabase/data';
 
 interface HabitStore {
-  // State
   habits: Habit[];
   entries: HabitEntry[];
   currentYear: number;
@@ -15,7 +16,6 @@ interface HabitStore {
   isLoaded: boolean;
   sidebarOpen: boolean;
 
-  // Actions
   setViewMode: (mode: ViewMode) => void;
   setMonth: (year: number, month: number) => void;
   nextMonth: () => void;
@@ -23,22 +23,46 @@ interface HabitStore {
   toggleDark: () => void;
   setSidebarOpen: (open: boolean) => void;
 
-  // Habit CRUD
   addHabit: (name: string, category?: string, goalDays?: number) => void;
   updateHabit: (id: string, updates: Partial<Habit>) => void;
   deleteHabit: (id: string) => void;
   toggleHabitActive: (id: string) => void;
   reorderHabits: (ids: string[]) => void;
 
-  // Entry actions
   toggleEntry: (habitId: string, date: string) => void;
   bulkToggle: (habitId: string, dates: string[], completed: boolean) => void;
 
-  // Data management
   initialize: () => void;
+  syncFromCloud: () => Promise<void>;
   exportAllData: () => string;
   importAllData: (json: string) => void;
   resetData: () => void;
+}
+
+// Helper: get current user ID
+async function getUserId(): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    return data.user?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+// Helper: sync habits to cloud (fire and forget)
+async function syncHabits(habits: Habit[]) {
+  const userId = await getUserId();
+  if (!userId) return;
+  upsertHabits(userId, habits).catch(console.error);
+}
+
+// Helper: sync entries to cloud (fire and forget)
+async function syncEntries(entries: HabitEntry[]) {
+  const userId = await getUserId();
+  if (!userId) return;
+  upsertEntries(userId, entries).catch(console.error);
 }
 
 export const useHabitStore = create<HabitStore>((set, get) => ({
@@ -101,6 +125,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     const updated = [...habits, newHabit];
     set({ habits: updated });
     saveHabits(updated);
+    syncHabits(updated);
   },
 
   updateHabit: (id, updates) => {
@@ -108,6 +133,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     const updated = habits.map(h => h.id === id ? { ...h, ...updates } : h);
     set({ habits: updated });
     saveHabits(updated);
+    syncHabits(updated);
   },
 
   deleteHabit: (id) => {
@@ -117,6 +143,15 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     set({ habits: updatedHabits, entries: updatedEntries });
     saveHabits(updatedHabits);
     saveEntries(updatedEntries);
+    // Delete from cloud
+    const userId = getUserId();
+    userId.then(uid => {
+      if (uid) {
+        deleteHabitDb(id);
+        deleteEntriesByHabit(id);
+      }
+    });
+    syncHabits(updatedHabits);
   },
 
   toggleHabitActive: (id) => {
@@ -124,6 +159,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     const updated = habits.map(h => h.id === id ? { ...h, isActive: !h.isActive } : h);
     set({ habits: updated });
     saveHabits(updated);
+    syncHabits(updated);
   },
 
   reorderHabits: (ids) => {
@@ -136,6 +172,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     }).filter(Boolean) as Habit[];
     set({ habits: updated });
     saveHabits(updated);
+    syncHabits(updated);
   },
 
   toggleEntry: (habitId, date) => {
@@ -162,6 +199,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ entries: updated });
     saveEntries(updated);
+    syncEntries(updated);
   },
 
   bulkToggle: (habitId, dates, completed) => {
@@ -189,9 +227,11 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
     set({ entries: updated });
     saveEntries(updated);
+    syncEntries(updated);
   },
 
   initialize: () => {
+    // Always load from localStorage first (instant)
     const habits = loadHabits();
     const entries = loadEntries();
     const isDark = loadTheme();
@@ -201,6 +241,35 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     }
 
     set({ habits, entries, isDark, isLoaded: true });
+
+    // Then try to load from cloud (async, overwrites localStorage if cloud has data)
+    get().syncFromCloud();
+  },
+
+  syncFromCloud: async () => {
+    const userId = await getUserId();
+    if (!userId) return;
+
+    try {
+      const [cloudHabits, cloudEntries] = await Promise.all([
+        fetchHabits(userId),
+        fetchEntries(userId),
+      ]);
+
+      if (cloudHabits.length > 0 || cloudEntries.length > 0) {
+        // Cloud has data — use it
+        set({ habits: cloudHabits, entries: cloudEntries });
+        saveHabits(cloudHabits);
+        saveEntries(cloudEntries);
+      } else {
+        // Cloud is empty — push localStorage data up
+        const { habits, entries } = get();
+        if (habits.length > 0) syncHabits(habits);
+        if (entries.length > 0) syncEntries(entries);
+      }
+    } catch (e) {
+      console.error('syncFromCloud error:', e);
+    }
   },
 
   exportAllData: () => {
@@ -214,6 +283,8 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       set({ habits: data.habits, entries: data.entries });
       saveHabits(data.habits);
       saveEntries(data.entries);
+      syncHabits(data.habits);
+      syncEntries(data.entries);
     }
   },
 
@@ -221,5 +292,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     set({ habits: [], entries: [] });
     saveHabits([]);
     saveEntries([]);
+    syncHabits([]);
+    syncEntries([]);
   },
 }));
