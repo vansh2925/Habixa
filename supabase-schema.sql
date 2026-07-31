@@ -76,31 +76,3 @@ CREATE INDEX idx_entries_user_id ON habit_entries(user_id);
 CREATE INDEX idx_entries_habit_id ON habit_entries(habit_id);
 CREATE INDEX idx_entries_date ON habit_entries(date);
 CREATE INDEX idx_entries_user_habit_date ON habit_entries(user_id, habit_id, date);
-
--- Push subscriptions (Web Push notifications)
-CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  endpoint TEXT NOT NULL UNIQUE,
-  keys_p256dh TEXT NOT NULL,
-  keys_auth TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own subscriptions" ON push_subscriptions FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own subscriptions" ON push_subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can delete own subscriptions" ON push_subscriptions FOR DELETE USING (auth.uid() = user_id);
-CREATE INDEX idx_push_subscriptions_user ON push_subscriptions(user_id);
-
--- Reminder settings (one daily reminder per user)
-CREATE TABLE IF NOT EXISTS reminders (
-  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  time TEXT NOT NULL DEFAULT '20:00', -- HH:MM 24h
-  enabled BOOLEAN DEFAULT true,
-  last_sent_date DATE,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own reminder" ON reminders FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own reminder" ON reminders FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own reminder" ON reminders FOR UPDATE USING (auth.uid() = user_id);

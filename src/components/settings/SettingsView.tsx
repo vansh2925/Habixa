@@ -6,7 +6,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { MONTHS } from '@/lib/constants';
 import { motion } from 'framer-motion';
 import { Download, Upload, Trash2, Moon, Sun, Palette, Calendar, Database, AlertTriangle, User, LogOut } from 'lucide-react';
-import { ReminderSettings } from './ReminderSettings';
 import { cn } from '@/lib/utils';
 
 export function SettingsView() {
@@ -103,9 +102,6 @@ export function SettingsView() {
           </div>
         </motion.div>
       )}
-
-      {/* Daily Reminder (PWA push notifications) */}
-      <ReminderSettings />
 
       {/* Appearance */}
       <motion.div
