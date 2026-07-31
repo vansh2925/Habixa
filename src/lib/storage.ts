@@ -2,12 +2,23 @@ import { Habit, HabitEntry } from '@/types';
 import { STORAGE_KEYS, DEFAULT_HABITS } from './constants';
 import { generateId } from './calculations';
 
+// Ensure every habit has schedule fields (migrates pre-schedule habits)
+export function normalizeHabit(h: Habit): Habit {
+  return {
+    ...h,
+    scheduleType: h.scheduleType ?? 'daily',
+    scheduleDays: h.scheduleDays ?? [],
+    timesPerWeek: h.timesPerWeek ?? 3,
+  };
+}
+
 export function loadHabits(): Habit[] {
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.HABITS);
     if (stored) {
-      return JSON.parse(stored);
+      const habits = JSON.parse(stored).map(normalizeHabit);
+      return habits;
     }
     const defaults = DEFAULT_HABITS.map((h, i) => ({
       id: generateId(),
@@ -17,6 +28,9 @@ export function loadHabits(): Habit[] {
       sortOrder: h.sortOrder,
       isActive: true,
       createdAt: new Date().toISOString(),
+      scheduleType: 'daily' as const,
+      scheduleDays: [] as number[],
+      timesPerWeek: 3,
     }));
     saveHabits(defaults);
     return defaults;

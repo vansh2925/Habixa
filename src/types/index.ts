@@ -1,3 +1,5 @@
+export type ScheduleType = 'daily' | 'weekdays' | 'weekend' | 'custom' | 'timesPerWeek';
+
 export interface Habit {
   id: string;
   name: string;
@@ -7,7 +9,10 @@ export interface Habit {
   sortOrder: number;
   isActive: boolean;
   createdAt: string;
-  scheduledDays?: number[]; // 0=Sun, 1=Mon, ... 6=Sat. Undefined = every day
+  // Scheduling
+  scheduleType: ScheduleType;
+  scheduleDays: number[]; // 0=Sun, 1=Mon, ... 6=Sat. Only used for custom (and derived for others)
+  timesPerWeek: number;   // used when scheduleType === 'timesPerWeek'
 }
 
 export interface HabitEntry {

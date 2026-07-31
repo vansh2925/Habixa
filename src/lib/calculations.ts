@@ -1,5 +1,6 @@
 import { Habit, HabitEntry, MonthlyStats, DailyStat, WeeklyStat, HabitStat, DashboardData } from '@/types';
 import { formatDateKey, getDaysInMonth, getWeekRanges } from './date-utils';
+import { isHabitScheduledOnDate, countScheduledDaysInMonth } from './schedule';
 
 export function getActiveHabits(habits: Habit[]): Habit[] {
   return habits.filter(h => h.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -23,10 +24,13 @@ export function getDailyStats(entries: HabitEntry[], activeHabits: Habit[], year
   const stats: DailyStat[] = [];
 
   for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month - 1, day);
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const dayEntries = entries.filter(e => e.date === dateStr);
     const completed = dayEntries.filter(e => e.completed).length;
-    const total = activeHabits.length;
+    // Only count habits that are actually scheduled on this day
+    const scheduledHabits = activeHabits.filter(h => isHabitScheduledOnDate(h, date));
+    const total = scheduledHabits.length;
 
     stats.push({
       date: dateStr,
@@ -50,10 +54,13 @@ export function getWeeklyStats(entries: HabitEntry[], activeHabits: Habit[], yea
     let total = 0;
 
     for (let day = range.start; day <= range.end; day++) {
+      const date = new Date(year, month - 1, day);
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayEntries = entries.filter(e => e.date === dateStr);
       completed += dayEntries.filter(e => e.completed).length;
-      total += activeHabits.length;
+      // Count only scheduled habit-days
+      const scheduled = activeHabits.filter(h => isHabitScheduledOnDate(h, date)).length;
+      total += scheduled;
     }
 
     return {
@@ -71,8 +78,13 @@ export function getHabitStats(entries: HabitEntry[], activeHabits: Habit[], year
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
 
   const stats = activeHabits.map(habit => {
+    // Real goal = number of scheduled days this month (not full month)
+    const goal = countScheduledDaysInMonth(habit, year, month);
     let completed = 0;
     for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month - 1, day);
+      // Only count completions on scheduled days
+      if (!isHabitScheduledOnDate(habit, date)) continue;
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       if (entries.some(e => e.habitId === habit.id && e.date === dateStr && e.completed)) {
         completed++;
@@ -83,9 +95,9 @@ export function getHabitStats(entries: HabitEntry[], activeHabits: Habit[], year
       habitId: habit.id,
       habitName: habit.name,
       completed,
-      goal: habit.goalDays,
-      remaining: Math.max(0, habit.goalDays - completed),
-      percentage: habit.goalDays > 0 ? completed / habit.goalDays : 0,
+      goal,
+      remaining: Math.max(0, goal - completed),
+      percentage: goal > 0 ? completed / goal : 0,
       rank: 0,
     };
   });
@@ -105,7 +117,8 @@ export function calculateMonthlyStats(entries: HabitEntry[], activeHabits: Habit
   const habitStats = getHabitStats(entries, activeHabits, year, month);
 
   const totalCompleted = entries.filter(e => e.completed).length;
-  const totalGoal = activeHabits.length * getDaysInMonth(new Date(year, month - 1));
+  // Real monthly goal = sum of each habit's scheduled days this month
+  const totalGoal = activeHabits.reduce((sum, h) => sum + countScheduledDaysInMonth(h, year, month), 0);
   const totalRemaining = Math.max(0, totalGoal - totalCompleted);
 
   return {
@@ -309,13 +322,14 @@ export function calculateDashboardData(
   const todayEntries = entries.filter(e => e.date === todayStr);
 
   const todayCompleted = todayEntries.filter(e => e.completed).length;
-  const todayTotal = activeHabits.length;
+  // Only habits scheduled today count toward today's total
+  const todayTotal = activeHabits.filter(h => isHabitScheduledOnDate(h, today)).length;
   const todayRemaining = todayTotal - todayCompleted;
   const todayPercentage = todayTotal > 0 ? todayCompleted / todayTotal : 0;
 
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
   const monthlyCompleted = entries.filter(e => e.completed).length;
-  const monthlyGoal = activeHabits.length * daysInMonth;
+  const monthlyGoal = activeHabits.reduce((sum, h) => sum + countScheduledDaysInMonth(h, year, month), 0);
   const monthlyRemaining = Math.max(0, monthlyGoal - monthlyCompleted);
   const monthlyPercentage = monthlyGoal > 0 ? monthlyCompleted / monthlyGoal : 0;
 

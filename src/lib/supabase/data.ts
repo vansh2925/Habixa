@@ -25,6 +25,9 @@ export async function fetchHabits(userId: string): Promise<Habit[]> {
     sortOrder: row.sort_order,
     isActive: row.is_active,
     createdAt: row.created_at,
+    scheduleType: row.schedule_type ?? 'daily',
+    scheduleDays: row.schedule_days ?? [],
+    timesPerWeek: row.times_per_week ?? 3,
   }));
 }
 
@@ -40,6 +43,9 @@ export async function upsertHabits(userId: string, habits: Habit[]): Promise<voi
     sort_order: h.sortOrder,
     is_active: h.isActive,
     created_at: h.createdAt,
+    schedule_type: h.scheduleType ?? 'daily',
+    schedule_days: h.scheduleDays ?? [],
+    times_per_week: h.timesPerWeek ?? 3,
   }));
 
   const { error } = await supabase

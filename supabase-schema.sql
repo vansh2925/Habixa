@@ -8,8 +8,16 @@ CREATE TABLE IF NOT EXISTS habits (
   goal_days INTEGER DEFAULT 30,
   sort_order INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  schedule_type TEXT DEFAULT 'daily',
+  schedule_days INTEGER[] DEFAULT '{}',
+  times_per_week INTEGER DEFAULT 3
 );
+
+-- Add schedule columns to existing table (if upgrading from previous version)
+ALTER TABLE habits ADD COLUMN IF NOT EXISTS schedule_type TEXT DEFAULT 'daily';
+ALTER TABLE habits ADD COLUMN IF NOT EXISTS schedule_days INTEGER[] DEFAULT '{}';
+ALTER TABLE habits ADD COLUMN IF NOT EXISTS times_per_week INTEGER DEFAULT 3;
 
 -- Create entries table
 CREATE TABLE IF NOT EXISTS habit_entries (

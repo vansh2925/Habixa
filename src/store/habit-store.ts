@@ -3,6 +3,7 @@ import { Habit, HabitEntry, ViewMode } from '@/types';
 import { loadHabits, saveHabits, loadEntries, saveEntries, loadTheme, saveTheme } from '@/lib/storage';
 import { generateId } from '@/lib/calculations';
 import { getCurrentYear, getCurrentMonth } from '@/lib/date-utils';
+import { buildSchedule } from '@/lib/schedule';
 import { isSupabaseConfigured, createClient } from '@/lib/supabase/client';
 import { fetchHabits, upsertHabits, deleteHabit as deleteHabitDb, fetchEntries, upsertEntries, deleteEntriesByHabit } from '@/lib/supabase/data';
 
@@ -23,7 +24,7 @@ interface HabitStore {
   toggleDark: () => void;
   setSidebarOpen: (open: boolean) => void;
 
-  addHabit: (name: string, category?: string, goalDays?: number) => void;
+  addHabit: (name: string, category?: string, goalDays?: number, scheduleType?: import('@/types').ScheduleType, scheduleDays?: number[], timesPerWeek?: number) => void;
   updateHabit: (id: string, updates: Partial<Habit>) => void;
   deleteHabit: (id: string) => void;
   toggleHabitActive: (id: string) => void;
@@ -110,17 +111,21 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
 
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-  addHabit: (name, category = 'general', goalDays = 30) => {
+  addHabit: (name, category = 'general', goalDays, scheduleType = 'daily', scheduleDays = [], timesPerWeek = 3) => {
     const { habits } = get();
     const maxOrder = habits.reduce((max, h) => Math.max(max, h.sortOrder), 0);
+    const schedule = buildSchedule(scheduleType, scheduleDays, timesPerWeek);
     const newHabit: Habit = {
       id: generateId(),
       name,
       category,
-      goalDays,
+      goalDays: goalDays ?? 30,
       sortOrder: maxOrder + 1,
       isActive: true,
       createdAt: new Date().toISOString(),
+      scheduleType: schedule.scheduleType,
+      scheduleDays: schedule.scheduleDays,
+      timesPerWeek: schedule.timesPerWeek,
     };
     const updated = [...habits, newHabit];
     set({ habits: updated });

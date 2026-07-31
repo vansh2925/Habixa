@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useHabitStore } from '@/store/habit-store';
 import { getActiveHabits, isHabitCompletedOnDate } from '@/lib/calculations';
 import { getDaysInMonth, formatDateKey } from '@/lib/date-utils';
+import { isHabitScheduledOnDate, countScheduledDaysInMonth } from '@/lib/schedule';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, GripVertical, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -61,12 +62,15 @@ function SortableHabitRow({
 
   let completedDays = 0;
   for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(currentYear, currentMonth - 1, d);
+    if (!isHabitScheduledOnDate(habit, date)) continue; // skip non-scheduled days
     const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     if (isHabitCompletedOnDate(entries, habit.id, dateStr)) {
       completedDays++;
     }
   }
-  const progress = habit.goalDays > 0 ? completedDays / habit.goalDays : 0;
+  const scheduledGoal = countScheduledDaysInMonth(habit, currentYear, currentMonth);
+  const progress = scheduledGoal > 0 ? completedDays / scheduledGoal : 0;
 
   return (
     <div
@@ -105,9 +109,21 @@ function SortableHabitRow({
             <div key={wi} className="flex-1 border-l border-gray-100 dark:border-gray-800 flex">
               {Array.from({ length: week.end - week.start + 1 }, (_, di) => {
                 const day = week.start + di;
+                const date = new Date(currentYear, currentMonth - 1, day);
                 const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const completed = isHabitCompletedOnDate(entries, habit.id, dateStr);
+                const scheduled = isHabitScheduledOnDate(habit, date);
+                const completed = scheduled && isHabitCompletedOnDate(entries, habit.id, dateStr);
                 const isToday = formatDateKey(new Date()) === dateStr;
+
+                if (!scheduled) {
+                  return (
+                    <div
+                      key={day}
+                      className="flex-1 h-8 flex items-center justify-center bg-gray-50/40 dark:bg-gray-800/20"
+                      title="Not scheduled"
+                    />
+                  );
+                }
 
                 return (
                   <button
@@ -145,7 +161,7 @@ function SortableHabitRow({
             progress >= 0.5 ? 'text-[#F59E0B]' :
             'text-gray-400'
           )}>
-            {completedDays}/{habit.goalDays}
+            {completedDays}/{scheduledGoal}
           </span>
         </div>
       </div>
@@ -234,6 +250,11 @@ export function HabitTracker() {
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('general');
   const [newGoal, setNewGoal] = useState(daysInMonth);
+  const [newScheduleType, setNewScheduleType] = useState<'daily' | 'weekdays' | 'weekend' | 'custom' | 'timesPerWeek'>('daily');
+  const [newScheduleDays, setNewScheduleDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [newTimesPerWeek, setNewTimesPerWeek] = useState(3);
+
+  const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -248,10 +269,13 @@ export function HabitTracker() {
 
   const handleAdd = () => {
     if (newName.trim()) {
-      addHabit(newName.trim(), newCategory, newGoal);
+      addHabit(newName.trim(), newCategory, newGoal, newScheduleType, newScheduleDays, newTimesPerWeek);
       setNewName('');
       setNewCategory('general');
       setNewGoal(daysInMonth);
+      setNewScheduleType('daily');
+      setNewScheduleDays([1, 2, 3, 4, 5]);
+      setNewTimesPerWeek(3);
       setShowAddForm(false);
     }
   };
@@ -312,34 +336,130 @@ export function HabitTracker() {
             exit={{ opacity: 0, height: 0 }}
             className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-100 dark:border-gray-800 p-4 overflow-hidden"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <input
-                type="text"
-                placeholder="Habit name..."
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                className="sm:col-span-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50"
-                autoFocus
-              />
-              <select
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50"
-              >
-                {CATEGORIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <div className="flex gap-2">
+            <div className="space-y-4">
+              {/* Row 1: name + category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
-                  type="number"
-                  value={newGoal}
-                  onChange={(e) => setNewGoal(Number(e.target.value))}
-                  min={1}
-                  max={31}
-                  className="w-16 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50"
+                  type="text"
+                  placeholder="Habit name..."
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50"
+                  autoFocus
                 />
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50"
+                >
+                  {CATEGORIES.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 2: schedule type */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">
+                  How often?
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {([
+                    { v: 'daily', l: 'Daily' },
+                    { v: 'weekdays', l: 'Weekdays' },
+                    { v: 'weekend', l: 'Weekends' },
+                    { v: 'custom', l: 'Pick days' },
+                    { v: 'timesPerWeek', l: 'N×/week' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setNewScheduleType(opt.v)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                        newScheduleType === opt.v
+                          ? 'bg-[#4F6BED] text-white'
+                          : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      )}
+                    >
+                      {opt.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row 3: schedule specifics */}
+              {newScheduleType === 'custom' && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">
+                    Select days
+                  </label>
+                  <div className="flex gap-1.5">
+                    {WEEKDAY_LABELS.map((label, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setNewScheduleDays(
+                          newScheduleDays.includes(i)
+                            ? newScheduleDays.filter(d => d !== i)
+                            : [...newScheduleDays, i].sort()
+                        )}
+                        className={cn(
+                          'w-8 h-8 rounded-lg text-xs font-semibold transition-colors',
+                          newScheduleDays.includes(i)
+                            ? 'bg-[#4F6BED] text-white'
+                            : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {newScheduleType === 'timesPerWeek' && (
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Times per week
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setNewTimesPerWeek(n)}
+                        className={cn(
+                          'w-7 h-7 rounded-lg text-xs font-semibold transition-colors',
+                          newTimesPerWeek === n
+                            ? 'bg-[#4F6BED] text-white'
+                            : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        )}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Row 4: goal + add */}
+              <div className="flex items-center justify-between pt-1 border-t border-gray-50 dark:border-gray-800">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Goal
+                  </label>
+                  <input
+                    type="number"
+                    value={newGoal}
+                    onChange={(e) => setNewGoal(Number(e.target.value))}
+                    min={1}
+                    max={31}
+                    className="w-16 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#4F6BED]/50"
+                  />
+                  <span className="text-xs text-gray-400 dark:text-gray-500">days</span>
+                </div>
                 <button
                   onClick={handleAdd}
                   className="px-4 py-2 bg-[#22C55E] text-white text-sm font-medium rounded-lg hover:bg-[#16A34A] transition-colors"
