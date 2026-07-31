@@ -14,7 +14,6 @@ import { SettingsViewWrapper } from '@/components/views/SettingsViewWrapper';
 import { AchievementsView } from '@/components/views/AchievementsView';
 import { ReviewView } from '@/components/views/ReviewView';
 import { HeatmapView } from '@/components/views/HeatmapView';
-import { SocialView } from '@/components/views/SocialView';
 import { InsightsView } from '@/components/views/InsightsView';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -66,7 +65,6 @@ export function AppShell() {
       case 'achievements': return <AchievementsView />;
       case 'review': return <ReviewView />;
       case 'heatmap': return <HeatmapView />;
-      case 'social': return <SocialView />;
       case 'insights': return <InsightsView />;
       default: return <DashboardView />;
     }

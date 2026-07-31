@@ -17,7 +17,6 @@ import {
   Trophy,
   CalendarCheck,
   Grid3x3,
-  Users,
   Brain,
   LogOut,
 } from 'lucide-react';
@@ -45,7 +44,6 @@ const navGroups = [
     label: 'Motivation',
     items: [
       { mode: 'achievements' as ViewMode, icon: Trophy, label: 'Achievements' },
-      { mode: 'social' as ViewMode, icon: Users, label: 'Accountability' },
     ],
   },
 ];

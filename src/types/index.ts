@@ -122,29 +122,7 @@ export interface AIInsight {
   priority: 'high' | 'medium' | 'low';
 }
 
-// Social
-export interface AccountabilityPartner {
-  id: string;
-  name: string;
-  avatar: string;
-  streak: number;
-  completionRate: number;
-  lastActive: string;
-  isCurrentUser?: boolean;
-}
-
-export interface SharedProgress {
-  userId: string;
-  name: string;
-  period: string;
-  completionRate: number;
-  streak: number;
-  habitsCompleted: number;
-  habitsTotal: number;
-  generatedAt: string;
-}
-
-export type ViewMode = 'dashboard' | 'habits' | 'calendar' | 'analytics' | 'settings' | 'achievements' | 'review' | 'social' | 'insights' | 'heatmap';
+export type ViewMode = 'dashboard' | 'habits' | 'calendar' | 'analytics' | 'settings' | 'achievements' | 'review' | 'insights' | 'heatmap';
 
 export interface ThemeState {
   isDark: boolean;

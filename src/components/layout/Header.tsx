@@ -19,7 +19,6 @@ export function Header() {
     achievements: 'Achievements',
     review: 'Weekly Review',
     heatmap: 'Heatmap',
-    social: 'Accountability',
     insights: 'AI Insights',
   };
 
