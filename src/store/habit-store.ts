@@ -32,6 +32,7 @@ interface HabitStore {
 
   toggleEntry: (habitId: string, date: string) => void;
   bulkToggle: (habitId: string, dates: string[], completed: boolean) => void;
+  updateEntryDetails: (habitId: string, date: string, details: { mood?: number; notes?: string }) => void;
 
   initialize: () => void;
   syncFromCloud: () => Promise<void>;
@@ -200,6 +201,32 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         completedAt: new Date().toISOString(),
       };
       updated = [...entries, newEntry];
+    }
+
+    set({ entries: updated });
+    saveEntries(updated);
+    syncEntries(updated);
+  },
+
+  updateEntryDetails: (habitId, date, details) => {
+    const { entries } = get();
+    let updated = [...entries];
+    const existing = updated.find(e => e.habitId === habitId && e.date === date);
+
+    if (existing) {
+      updated = updated.map(e =>
+        e.habitId === habitId && e.date === date ? { ...e, ...details } : e
+      );
+    } else {
+      // No entry yet — create a completed entry with the details
+      updated.push({
+        id: generateId(),
+        habitId,
+        date,
+        completed: true,
+        completedAt: new Date().toISOString(),
+        ...details,
+      });
     }
 
     set({ entries: updated });
