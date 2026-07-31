@@ -1,22 +1,35 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useHabitStore } from '@/store/habit-store';
 import { getActiveHabits, getEntriesForMonth } from '@/lib/calculations';
 import { generateInsights } from '@/lib/insights';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Brain, Sparkles, AlertTriangle, TrendingUp, Zap, Lightbulb } from 'lucide-react';
+import { Brain, Sparkles, AlertTriangle, TrendingUp, Zap, Lightbulb, Check, ArrowRight } from 'lucide-react';
+import type { AIInsight } from '@/types';
 
 export function AIInsights() {
-  const { habits, entries, currentYear, currentMonth } = useHabitStore();
+  const { habits, entries, currentYear, currentMonth, reorderHabits } = useHabitStore();
   const activeHabits = getActiveHabits(habits);
   const monthEntries = getEntriesForMonth(entries, currentYear, currentMonth);
+  const [applied, setApplied] = useState<Set<string>>(new Set());
 
   const insights = useMemo(
     () => generateInsights(habits, entries, currentYear, currentMonth),
     [habits, entries, currentYear, currentMonth]
   );
+
+  // Apply an insight's action: move the suggested habits to the top
+  const handleApply = (insight: AIInsight) => {
+    if (!insight.action || applied.has(insight.id)) return;
+    const { habitIds } = insight.action;
+    // Put the anchor habits first, then the rest in their current order
+    const anchorIds = habitIds.filter(id => activeHabits.some(h => h.id === id));
+    const rest = activeHabits.filter(h => !anchorIds.includes(h.id)).map(h => h.id);
+    reorderHabits([...anchorIds, ...rest]);
+    setApplied(prev => new Set(prev).add(insight.id));
+  };
 
   const typeConfig: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
     pattern: { icon: TrendingUp, color: '#4F6BED', bg: '#EEF0FF', label: 'Pattern' },
@@ -100,6 +113,32 @@ export function AIInsights() {
                         {Math.round(insight.confidence * 100)}% confidence
                       </span>
                     </div>
+
+                    {/* Actionable insight */}
+                    {insight.action && (
+                      <button
+                        onClick={() => handleApply(insight)}
+                        disabled={applied.has(insight.id)}
+                        className={cn(
+                          'mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
+                          applied.has(insight.id)
+                            ? 'bg-[#22C55E]/10 text-[#22C55E] cursor-default'
+                            : 'bg-[#4F6BED] text-white hover:bg-[#3D57D9]'
+                        )}
+                      >
+                        {applied.has(insight.id) ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            {insight.action.appliedLabel}
+                          </>
+                        ) : (
+                          <>
+                            {insight.action.label}
+                            <ArrowRight className="w-3 h-3" />
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>

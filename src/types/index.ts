@@ -128,6 +128,13 @@ export interface AIInsight {
   confidence: number; // 0-1
   icon: string;
   priority: 'high' | 'medium' | 'low';
+  // Optional: a concrete action the user can take to act on this insight
+  action?: {
+    label: string;      // button text, e.g. "Reorder habits"
+    kind: 'reorder';    // which store action to run
+    habitIds: string[]; // e.g. put these at the top
+    appliedLabel: string; // text shown after applied, e.g. "Reorder applied"
+  };
 }
 
 export type ViewMode = 'dashboard' | 'habits' | 'calendar' | 'analytics' | 'settings' | 'achievements' | 'review' | 'insights' | 'heatmap';

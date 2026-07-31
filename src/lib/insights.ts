@@ -155,10 +155,16 @@ export function generateInsights(
           id: 'morning-correlation',
           type: 'correlation',
           title: 'Morning Routine = Productive Day',
-          description: `When you complete your morning habits, you're ${Math.round(correlation * 100)}% likely to complete the rest of your day. Your morning routine is the foundation!`,
+          description: `When you complete your morning habits, you're ${Math.round(correlation * 100)}% likely to complete the rest of your day. Put your morning routine first so it anchors your whole day.`,
           confidence: correlation,
           icon: '🌅',
           priority: 'high',
+          action: {
+            label: 'Reorder to anchor',
+            kind: 'reorder',
+            habitIds: morningHabits.map(h => h.id),
+            appliedLabel: 'Reordered — morning habits first',
+          },
         });
       }
     }
