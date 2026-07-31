@@ -29,14 +29,12 @@ CREATE TABLE IF NOT EXISTS habit_entries (
   completed_at TIMESTAMPTZ,
   notes TEXT,
   mood INTEGER,
-  missed_reason TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, habit_id, date)
 );
 
--- Add columns to existing table (if upgrading)
+-- Add mood column to existing table (if upgrading)
 ALTER TABLE habit_entries ADD COLUMN IF NOT EXISTS mood INTEGER;
-ALTER TABLE habit_entries ADD COLUMN IF NOT EXISTS missed_reason TEXT;
 
 -- Enable Row Level Security
 ALTER TABLE habits ENABLE ROW LEVEL SECURITY;

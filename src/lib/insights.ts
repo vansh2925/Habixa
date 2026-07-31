@@ -188,50 +188,6 @@ export function generateInsights(
     }
   }
 
-  // Diagnostic: miss reasons (captured via the miss prompt)
-  const missReasons = monthEntries.filter(e => e.missedReason);
-  if (missReasons.length >= 2) {
-    const reasonCounts: Record<string, number> = {};
-    for (const e of missReasons) {
-      reasonCounts[e.missedReason!] = (reasonCounts[e.missedReason!] || 0) + 1;
-    }
-    const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0];
-    const reasonLabels: Record<string, string> = {
-      'no-time': 'running out of time',
-      forgot: 'simply forgetting',
-      'low-energy': 'low energy',
-      'not-motivated': 'lacking motivation',
-    };
-
-    // Correlate the top reason with a day of week
-    const reasonByDay: Record<number, { count: number; habit: string }> = {};
-    for (const e of missReasons) {
-      if (e.missedReason !== topReason[0]) continue;
-      const d = new Date(e.date + 'T00:00:00');
-      const dow = d.getDay();
-      const habitName = activeHabits.find(h => h.id === e.habitId)?.name || 'a habit';
-      if (!reasonByDay[dow]) reasonByDay[dow] = { count: 0, habit: habitName };
-      reasonByDay[dow].count++;
-      reasonByDay[dow].habit = habitName;
-    }
-    const topDay = Object.entries(reasonByDay).sort((a, b) => b[1].count - a[1].count)[0];
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    if (topReason && topReason[0] && topReason[1] >= 2) {
-      insights.push({
-        id: 'miss-reason-pattern',
-        type: 'correlation',
-        title: `The Real Reason You Skip: ${topDay ? dayNames[Number(topDay[0])] + 's' : 'Sometimes'}`,
-        description: topDay
-          ? `You've missed habits ${topReason[1]} time${topReason[1] > 1 ? 's' : ''} mostly due to ${reasonLabels[topReason[0]]} — especially on ${dayNames[Number(topDay[0])]} (e.g. "${topDay[1].habit}"). That points to a scheduling or recovery issue, not a willpower one.`
-          : `Your most common miss reason is ${reasonLabels[topReason[0]]} (${topReason[1]}×). Address the cause, not the habit.`,
-        confidence: 0.75,
-        icon: '🔍',
-        priority: 'high',
-      });
-    }
-  }
-
   // Struggling habits recommendation
   if (struggling.length > 0) {
     insights.push({

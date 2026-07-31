@@ -87,7 +87,6 @@ export async function fetchEntries(userId: string): Promise<HabitEntry[]> {
     completedAt: row.completed_at,
     notes: row.notes,
     mood: row.mood,
-    missedReason: row.missed_reason,
   }));
 }
 
@@ -102,7 +101,6 @@ export async function upsertEntries(userId: string, entries: HabitEntry[]): Prom
     completed_at: e.completedAt || null,
     notes: e.notes || null,
     mood: e.mood ?? null,
-    missed_reason: e.missedReason || null,
   }));
 
   const { error } = await supabase
