@@ -69,6 +69,9 @@ export interface DashboardData {
   monthlyPercentage: number;
   currentStreak: number;
   longestStreak: number;
+  frozenUsed: number;
+  hasFreeze: boolean;
+  sevenDayConsistency: number;
   weeklyStats: WeeklyStat[];
   topHabits: HabitStat[];
   recentActivity: DailyStat[];

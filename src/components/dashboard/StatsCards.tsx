@@ -38,9 +38,11 @@ export function StatsCards() {
       bgColor: '#FEF3C7',
     },
     {
-      label: 'Best Streak',
-      value: `${data.longestStreak}d`,
-      subtext: 'consecutive days',
+      label: 'Current Streak',
+      value: `${data.currentStreak}d`,
+      subtext: data.frozenUsed > 0
+        ? `${data.frozenUsed} freeze used · 7-day ${Math.round(data.sevenDayConsistency * 100)}%`
+        : `7-day consistency ${Math.round(data.sevenDayConsistency * 100)}%`,
       icon: Flame,
       color: '#EF4444',
       bgColor: '#FEE2E2',

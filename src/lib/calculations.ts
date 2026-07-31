@@ -152,41 +152,150 @@ export function calculateStreak(entries: HabitEntry[], habitId: string, year: nu
   return { current, longest };
 }
 
-export function calculateOverallStreak(entries: HabitEntry[], activeHabits: Habit[], year: number, month: number): { current: number; longest: number } {
+/**
+ * Overall streak with a built-in "streak freeze":
+ * - A day counts toward the streak if it's a "good day" (≥ streakGoal% of habits done)
+ * - Up to `freezePerWeek` missed days per 7-day window do NOT break the streak
+ * This avoids the all-or-nothing trap where one bad day kills momentum.
+ */
+export function calculateOverallStreak(
+  entries: HabitEntry[],
+  activeHabits: Habit[],
+  year: number,
+  month: number,
+  streakGoal = 0.6,       // a "good day" = ≥60% of habits completed
+  freezePerWeek = 1       // allow 1 miss per 7 days without breaking
+): { current: number; longest: number; frozenUsed: number; hasFreeze: boolean } {
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
+
+  // Mark each day of the month as good (met goal) or miss
+  const dayQualities: boolean[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayEntries = entries.filter(e => e.date === dateStr);
+    const completedCount = dayEntries.filter(e => e.completed).length;
+    const isGood = activeHabits.length > 0 && (completedCount / activeHabits.length) >= streakGoal;
+    dayQualities.push(isGood);
+  }
+
+  // A miss only breaks the streak if it exceeds the freeze allowance
+  // in the trailing 7-day window (counted from the miss going backward).
+  const breaksStreak = (missIndex: number): boolean => {
+    let misses = 0;
+    for (let i = missIndex; i >= 0 && i > missIndex - 7; i--) {
+      if (!dayQualities[i]) misses++;
+    }
+    // This miss is the one that pushes us over the allowance
+    return misses > freezePerWeek;
+  };
+
+  // Current streak: walk backwards from the last day of the month
   let current = 0;
+  let frozenUsed = 0;
+  let broke = false;
+  for (let day = daysInMonth - 1; day >= 0 && !broke; day--) {
+    if (dayQualities[day]) {
+      current++;
+    } else if (!breaksStreak(day)) {
+      // Freeze used — this miss is forgiven
+      current++;
+      frozenUsed++;
+    } else {
+      broke = true;
+    }
+  }
+
+  // Longest streak: walk forward, applying the same freeze rule
   let longest = 0;
-  let tempStreak = 0;
+  let run = 0;
+  for (let day = 0; day < daysInMonth; day++) {
+    if (dayQualities[day]) {
+      run++;
+      longest = Math.max(longest, run);
+    } else if (!breaksStreak(day)) {
+      run++; // freeze forgives
+      longest = Math.max(longest, run);
+    } else {
+      run = 0;
+    }
+  }
+
+  return { current, longest, frozenUsed, hasFreeze: freezePerWeek > 0 };
+}
+
+/**
+ * Rolling 7-day consistency: fraction of the last N days (up to `window`) that
+ * met the "good day" goal. A friendlier headline metric than a fragile chain.
+ */
+export function calculateConsistency(
+  entries: HabitEntry[],
+  activeHabits: Habit[],
+  year: number,
+  month: number,
+  window = 7,
+  streakGoal = 0.6
+): { percentage: number; goodDays: number; totalDays: number } {
+  const daysInMonth = getDaysInMonth(new Date(year, month - 1));
+  const goodDays: boolean[] = [];
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const dayEntries = entries.filter(e => e.date === dateStr);
     const completedCount = dayEntries.filter(e => e.completed).length;
-
-    // A day is "complete" if all habits are done
-    if (completedCount >= activeHabits.length && activeHabits.length > 0) {
-      tempStreak++;
-      longest = Math.max(longest, tempStreak);
-    } else {
-      tempStreak = 0;
-    }
+    goodDays.push(activeHabits.length > 0 && (completedCount / activeHabits.length) >= streakGoal);
   }
 
-  // Current streak from the end
-  current = 0;
-  for (let day = daysInMonth; day >= 1; day--) {
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dayEntries = entries.filter(e => e.date === dateStr);
-    const completedCount = dayEntries.filter(e => e.completed).length;
+  const recent = goodDays.slice(-window);
+  const good = recent.filter(Boolean).length;
+  return { percentage: recent.length > 0 ? good / recent.length : 0, goodDays: good, totalDays: recent.length };
+}
 
-    if (completedCount >= activeHabits.length && activeHabits.length > 0) {
-      current++;
-    } else {
-      break;
+/**
+ * Per-habit streak with the same freeze rule, so users can see each habit's
+ * own momentum (a habit you're consistent on shows a streak even if you
+ * missed it one day). Returns a map of habitId -> streak days.
+ */
+export function calculatePerHabitStreaks(
+  entries: HabitEntry[],
+  activeHabits: Habit[],
+  year: number,
+  month: number,
+  freezePerWeek = 1
+): Record<string, number> {
+  const daysInMonth = getDaysInMonth(new Date(year, month - 1));
+  const result: Record<string, number> = {};
+
+  for (const habit of activeHabits) {
+    // Build day-by-day completion for this habit
+    const dayDone: boolean[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      dayDone.push(entries.some(e => e.habitId === habit.id && e.date === dateStr && e.completed));
     }
+
+    const breaksStreak = (missIndex: number): boolean => {
+      let misses = 0;
+      for (let i = missIndex; i >= 0 && i > missIndex - 7; i--) {
+        if (!dayDone[i]) misses++;
+      }
+      return misses > freezePerWeek;
+    };
+
+    // Current streak (from the end of the month backward)
+    let streak = 0;
+    for (let day = daysInMonth - 1; day >= 0; day--) {
+      if (dayDone[day]) {
+        streak++;
+      } else if (!breaksStreak(day)) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    result[habit.id] = streak;
   }
 
-  return { current, longest };
+  return result;
 }
 
 export function calculateDashboardData(
@@ -211,6 +320,7 @@ export function calculateDashboardData(
   const monthlyPercentage = monthlyGoal > 0 ? monthlyCompleted / monthlyGoal : 0;
 
   const streak = calculateOverallStreak(entries, activeHabits, year, month);
+  const consistency = calculateConsistency(entries, activeHabits, year, month, 7);
   const weeklyStats = getWeeklyStats(entries, activeHabits, year, month);
   const topHabits = getHabitStats(entries, activeHabits, year, month).slice(0, 10);
   const recentActivity = getDailyStats(entries, activeHabits, year, month).slice(-7);
@@ -226,6 +336,9 @@ export function calculateDashboardData(
     monthlyPercentage,
     currentStreak: streak.current,
     longestStreak: streak.longest,
+    frozenUsed: streak.frozenUsed,
+    hasFreeze: streak.hasFreeze,
+    sevenDayConsistency: consistency.percentage,
     weeklyStats,
     topHabits,
     recentActivity,

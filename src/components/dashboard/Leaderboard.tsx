@@ -1,9 +1,9 @@
 'use client';
 
 import { useHabitStore } from '@/store/habit-store';
-import { getActiveHabits, getEntriesForMonth, getHabitStats } from '@/lib/calculations';
+import { getActiveHabits, getEntriesForMonth, getHabitStats, calculatePerHabitStreaks } from '@/lib/calculations';
 import { motion } from 'framer-motion';
-import { Trophy, Medal, Award } from 'lucide-react';
+import { Trophy, Medal, Award, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Leaderboard() {
@@ -12,6 +12,7 @@ export function Leaderboard() {
   const monthEntries = getEntriesForMonth(entries, currentYear, currentMonth);
   const habitStats = getHabitStats(monthEntries, activeHabits, currentYear, currentMonth)
     .slice(0, 10);
+  const streaks = calculatePerHabitStreaks(monthEntries, activeHabits, currentYear, currentMonth);
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Trophy className="w-4 h-4 text-[#F59E0B]" />;
@@ -61,7 +62,10 @@ export function Leaderboard() {
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
                   {stat.habitName}
                 </div>
-                <div className="text-[11px] text-gray-400 dark:text-gray-500">
+                <div className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                  <Flame className="w-3 h-3 text-[#F59E0B]" />
+                  {streaks[stat.habitId] || 0}d streak
+                  <span className="text-gray-300 dark:text-gray-700">·</span>
                   {stat.completed}/{stat.goal} days
                 </div>
               </div>
