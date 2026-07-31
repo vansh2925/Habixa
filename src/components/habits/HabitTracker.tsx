@@ -6,7 +6,9 @@ import { getActiveHabits, isHabitCompletedOnDate } from '@/lib/calculations';
 import { getDaysInMonth, formatDateKey } from '@/lib/date-utils';
 import { isHabitScheduledOnDate, countScheduledDaysInMonth } from '@/lib/schedule';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, GripVertical, Check } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Check, Pencil } from 'lucide-react';
+import { SchedulePicker, ScheduleValue } from './SchedulePicker';
+import { EditHabitModal } from './EditHabitModal';
 import { cn } from '@/lib/utils';
 import { CATEGORIES } from '@/lib/constants';
 import { Habit } from '@/types';
@@ -174,10 +176,12 @@ function SortableManageRow({
   habit,
   toggleHabitActive,
   deleteHabit,
+  onEdit,
 }: {
   habit: Habit;
   toggleHabitActive: (id: string) => void;
   deleteHabit: (id: string) => void;
+  onEdit: (habit: Habit) => void;
 }) {
   const {
     attributes,
@@ -232,6 +236,13 @@ function SortableManageRow({
         {habit.isActive ? 'Active' : 'Inactive'}
       </button>
       <button
+        onClick={() => onEdit(habit)}
+        className="p-1.5 rounded-md text-gray-400 hover:text-[#4F6BED] hover:bg-[#4F6BED]/10 transition-colors"
+        title="Edit habit"
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+      <button
         onClick={() => deleteHabit(habit.id)}
         className="p-1.5 rounded-md text-gray-400 hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors"
       >
@@ -242,7 +253,7 @@ function SortableManageRow({
 }
 
 export function HabitTracker() {
-  const { habits, entries, currentYear, currentMonth, toggleEntry, addHabit, deleteHabit, toggleHabitActive, reorderHabits } = useHabitStore();
+  const { habits, entries, currentYear, currentMonth, toggleEntry, addHabit, updateHabit, deleteHabit, toggleHabitActive, reorderHabits } = useHabitStore();
   const activeHabits = getActiveHabits(habits);
   const daysInMonth = getDaysInMonth(new Date(currentYear, currentMonth - 1));
 
@@ -250,11 +261,8 @@ export function HabitTracker() {
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('general');
   const [newGoal, setNewGoal] = useState(daysInMonth);
-  const [newScheduleType, setNewScheduleType] = useState<'daily' | 'weekdays' | 'weekend' | 'custom' | 'timesPerWeek'>('daily');
-  const [newScheduleDays, setNewScheduleDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [newTimesPerWeek, setNewTimesPerWeek] = useState(3);
-
-  const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const [newSchedule, setNewSchedule] = useState<ScheduleValue>({ scheduleType: 'daily', scheduleDays: [1, 2, 3, 4, 5], timesPerWeek: 3 });
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -269,13 +277,11 @@ export function HabitTracker() {
 
   const handleAdd = () => {
     if (newName.trim()) {
-      addHabit(newName.trim(), newCategory, newGoal, newScheduleType, newScheduleDays, newTimesPerWeek);
+      addHabit(newName.trim(), newCategory, newGoal, newSchedule.scheduleType, newSchedule.scheduleDays, newSchedule.timesPerWeek);
       setNewName('');
       setNewCategory('general');
       setNewGoal(daysInMonth);
-      setNewScheduleType('daily');
-      setNewScheduleDays([1, 2, 3, 4, 5]);
-      setNewTimesPerWeek(3);
+      setNewSchedule({ scheduleType: 'daily', scheduleDays: [1, 2, 3, 4, 5], timesPerWeek: 3 });
       setShowAddForm(false);
     }
   };
@@ -359,90 +365,13 @@ export function HabitTracker() {
                 </select>
               </div>
 
-              {/* Row 2: schedule type */}
+              {/* Row 2-3: schedule */}
               <div>
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">
                   How often?
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  {([
-                    { v: 'daily', l: 'Daily' },
-                    { v: 'weekdays', l: 'Weekdays' },
-                    { v: 'weekend', l: 'Weekends' },
-                    { v: 'custom', l: 'Pick days' },
-                    { v: 'timesPerWeek', l: 'N×/week' },
-                  ] as const).map(opt => (
-                    <button
-                      key={opt.v}
-                      type="button"
-                      onClick={() => setNewScheduleType(opt.v)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                        newScheduleType === opt.v
-                          ? 'bg-[#4F6BED] text-white'
-                          : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      )}
-                    >
-                      {opt.l}
-                    </button>
-                  ))}
-                </div>
+                <SchedulePicker value={newSchedule} onChange={setNewSchedule} />
               </div>
-
-              {/* Row 3: schedule specifics */}
-              {newScheduleType === 'custom' && (
-                <div>
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">
-                    Select days
-                  </label>
-                  <div className="flex gap-1.5">
-                    {WEEKDAY_LABELS.map((label, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setNewScheduleDays(
-                          newScheduleDays.includes(i)
-                            ? newScheduleDays.filter(d => d !== i)
-                            : [...newScheduleDays, i].sort()
-                        )}
-                        className={cn(
-                          'w-8 h-8 rounded-lg text-xs font-semibold transition-colors',
-                          newScheduleDays.includes(i)
-                            ? 'bg-[#4F6BED] text-white'
-                            : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {newScheduleType === 'timesPerWeek' && (
-                <div className="flex items-center gap-3">
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                    Times per week
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    {[1, 2, 3, 4, 5, 6, 7].map(n => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setNewTimesPerWeek(n)}
-                        className={cn(
-                          'w-7 h-7 rounded-lg text-xs font-semibold transition-colors',
-                          newTimesPerWeek === n
-                            ? 'bg-[#4F6BED] text-white'
-                            : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        )}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Row 4: goal + add */}
               <div className="flex items-center justify-between pt-1 border-t border-gray-50 dark:border-gray-800">
@@ -542,11 +471,23 @@ export function HabitTracker() {
                 habit={habit}
                 toggleHabitActive={toggleHabitActive}
                 deleteHabit={deleteHabit}
+                onEdit={setEditingHabit}
               />
             ))}
           </SortableContext>
         </DndContext>
       </div>
+
+      {/* Edit modal */}
+      <AnimatePresence>
+        {editingHabit && (
+          <EditHabitModal
+            habit={editingHabit}
+            onSave={updateHabit}
+            onClose={() => setEditingHabit(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
