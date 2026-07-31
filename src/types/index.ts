@@ -23,7 +23,17 @@ export interface HabitEntry {
   completedAt?: string;
   notes?: string;
   mood?: number; // 1-5
+  missedReason?: string; // 'no-time' | 'forgot' | 'low-energy' | 'not-motivated'
 }
+
+export const MISS_REASONS = [
+  { value: 'no-time', label: 'No time' },
+  { value: 'forgot', label: 'Forgot' },
+  { value: 'low-energy', label: 'Low energy' },
+  { value: 'not-motivated', label: 'Not motivated' },
+] as const;
+
+export type MissReason = (typeof MISS_REASONS)[number]['value'];
 
 export interface MonthlyStats {
   totalCompleted: number;
