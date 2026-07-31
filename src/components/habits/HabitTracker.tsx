@@ -5,8 +5,9 @@ import { useHabitStore } from '@/store/habit-store';
 import { getActiveHabits, isHabitCompletedOnDate } from '@/lib/calculations';
 import { getDaysInMonth, formatDateKey } from '@/lib/date-utils';
 import { isHabitScheduledOnDate, countScheduledDaysInMonth } from '@/lib/schedule';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, GripVertical, Check, Pencil } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Check, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SchedulePicker, ScheduleValue } from './SchedulePicker';
 import { moodEmoji } from '@/components/MoodPicker';
 import { EditHabitModal } from './EditHabitModal';
@@ -107,7 +108,7 @@ function SortableHabitRow({
         </div>
 
         {/* Day toggles */}
-        <div className="flex-1 flex">
+        <div className="flex-1 flex min-w-fit">
           {weekRanges.map((week, wi) => (
             <div key={wi} className="flex-1 border-l border-gray-100 dark:border-gray-800 flex">
               {Array.from({ length: week.end - week.start + 1 }, (_, di) => {
@@ -274,6 +275,8 @@ export function HabitTracker() {
   const [newSchedule, setNewSchedule] = useState<ScheduleValue>({ scheduleType: 'daily', scheduleDays: [1, 2, 3, 4, 5], timesPerWeek: 3 });
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
 
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -284,6 +287,11 @@ export function HabitTracker() {
     const end = Math.min(i + 6, daysInMonth);
     weekRanges.push({ start: i, end, label: `W${weekRanges.length + 1}` });
   }
+
+  // Mobile: which week of the month to show (default = the week containing today)
+  const todayWeek = Math.min(weekRanges.length - 1, Math.floor((new Date().getDate() - 1) / 7));
+  const [mobileWeek, setMobileWeek] = useState(todayWeek);
+  const visibleWeeks = isDesktop ? weekRanges : [weekRanges[mobileWeek] || weekRanges[0]];
 
   const handleAdd = () => {
     if (newName.trim()) {
@@ -412,14 +420,39 @@ export function HabitTracker() {
       </AnimatePresence>
 
       {/* Tracker grid with drag and drop */}
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-100 dark:border-gray-800 overflow-x-auto lg:overflow-visible">
+        {/* Mobile week navigation */}
+        {!isDesktop && (
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 lg:hidden">
+            <button
+              onClick={() => setMobileWeek(Math.max(0, mobileWeek - 1))}
+              disabled={mobileWeek === 0}
+              className="p-1.5 rounded-md text-gray-500 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+              Week {mobileWeek + 1} of {weekRanges.length}
+            </span>
+            <button
+              onClick={() => setMobileWeek(Math.min(weekRanges.length - 1, mobileWeek + 1))}
+              disabled={mobileWeek >= weekRanges.length - 1}
+              className="p-1.5 rounded-md text-gray-500 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
+              aria-label="Next week"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Week headers */}
-        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 min-w-fit">
           <div className="w-[200px] min-w-[200px] px-4 py-2.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
             Habit
           </div>
           <div className="flex-1 flex">
-            {weekRanges.map((week, wi) => (
+            {visibleWeeks.map((week, wi) => (
               <div key={wi} className="flex-1 border-l border-gray-100 dark:border-gray-800">
                 <div className="px-1 py-2.5 text-center text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                   {week.label}
@@ -454,7 +487,7 @@ export function HabitTracker() {
                 currentMonth={currentMonth}
                 entries={entries}
                 toggleEntry={toggleEntry}
-                weekRanges={weekRanges}
+                weekRanges={visibleWeeks}
               />
             ))}
           </SortableContext>
