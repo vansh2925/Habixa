@@ -2,6 +2,7 @@
 
 import { useHabitStore } from '@/store/habit-store';
 import { getActiveHabits, isHabitCompletedOnDate } from '@/lib/calculations';
+import { isHabitScheduledOnDate } from '@/lib/schedule';
 import { getTodayString } from '@/lib/date-utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check } from 'lucide-react';
@@ -11,7 +12,9 @@ export function TodayHabits() {
   const { habits, entries, toggleEntry } = useHabitStore();
   const activeHabits = getActiveHabits(habits);
   const today = getTodayString();
-  const completedCount = activeHabits.filter(h =>
+  // Only show habits scheduled to run today (weekdays/weekend/custom/N×/week)
+  const todaysHabits = activeHabits.filter(h => isHabitScheduledOnDate(h, new Date()));
+  const completedCount = todaysHabits.filter(h =>
     isHabitCompletedOnDate(entries, h.id, today)
   ).length;
 
@@ -21,17 +24,17 @@ export function TodayHabits() {
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Today</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {completedCount} of {activeHabits.length} completed
+            {completedCount} of {todaysHabits.length} completed
           </p>
         </div>
         <div className="text-xs font-medium text-[#4F6BED] bg-[#EEF0FF] dark:bg-[#4F6BED]/20 px-2.5 py-1 rounded-full">
-          {activeHabits.length > 0 ? Math.round((completedCount / activeHabits.length) * 100) : 0}%
+          {todaysHabits.length > 0 ? Math.round((completedCount / todaysHabits.length) * 100) : 0}%
         </div>
       </div>
 
       <div className="divide-y divide-gray-50 dark:divide-gray-800 max-h-[400px] overflow-y-auto">
         <AnimatePresence>
-          {activeHabits.map((habit, i) => {
+          {todaysHabits.map((habit, i) => {
             const completed = isHabitCompletedOnDate(entries, habit.id, today);
             return (
               <motion.button
@@ -79,6 +82,12 @@ export function TodayHabits() {
             );
           })}
         </AnimatePresence>
+
+        {todaysHabits.length === 0 && (
+          <div className="px-5 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+            No habits scheduled today. Enjoy the day off! 🎉
+          </div>
+        )}
       </div>
     </div>
   );
