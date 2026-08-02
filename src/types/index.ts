@@ -21,8 +21,6 @@ export interface HabitEntry {
   date: string; // YYYY-MM-DD
   completed: boolean;
   completedAt?: string;
-  notes?: string;
-  mood?: number; // 1-5
 }
 
 export interface MonthlyStats {

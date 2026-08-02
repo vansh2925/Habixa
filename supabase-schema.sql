@@ -27,14 +27,9 @@ CREATE TABLE IF NOT EXISTS habit_entries (
   date TEXT NOT NULL,
   completed BOOLEAN DEFAULT false,
   completed_at TIMESTAMPTZ,
-  notes TEXT,
-  mood INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, habit_id, date)
 );
-
--- Add mood column to existing table (if upgrading)
-ALTER TABLE habit_entries ADD COLUMN IF NOT EXISTS mood INTEGER;
 
 -- Enable Row Level Security
 ALTER TABLE habits ENABLE ROW LEVEL SECURITY;

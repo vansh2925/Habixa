@@ -9,7 +9,6 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, GripVertical, Check, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SchedulePicker, ScheduleValue } from './SchedulePicker';
-import { moodEmoji } from '@/components/MoodPicker';
 import { EditHabitModal } from './EditHabitModal';
 import { cn } from '@/lib/utils';
 import { CATEGORIES } from '@/lib/constants';
@@ -118,8 +117,6 @@ function SortableHabitRow({
                 const scheduled = isHabitScheduledOnDate(habit, date);
                 const completed = scheduled && isHabitCompletedOnDate(entries, habit.id, dateStr);
                 const isToday = formatDateKey(new Date()) === dateStr;
-                const dayEntry = entries.find(e => e.habitId === habit.id && e.date === dateStr);
-                const dayMood = moodEmoji(dayEntry?.mood);
 
                 if (!scheduled) {
                   return (
@@ -142,12 +139,8 @@ function SortableHabitRow({
                         ? 'bg-[#22C55E]/10 hover:bg-[#22C55E]/20'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                     )}
-                    title={dayEntry?.notes ? `Note: ${dayEntry.notes}` : undefined}
                   >
-                    {completed && dayMood && (
-                      <span className="text-[9px] leading-none">{dayMood}</span>
-                    )}
-                    {completed && !dayMood && (
+                    {completed && (
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
@@ -155,9 +148,6 @@ function SortableHabitRow({
                       >
                         <Check className="w-3 h-3 text-[#22C55E]" strokeWidth={3} />
                       </motion.div>
-                    )}
-                    {dayEntry?.notes && completed && !dayMood && (
-                      <span className="text-[9px] leading-none text-[#4F6BED] ml-0.5">•</span>
                     )}
                   </button>
                 );
