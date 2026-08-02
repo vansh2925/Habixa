@@ -3,7 +3,7 @@
 import { useHabitStore } from '@/store/habit-store';
 import { getActiveHabits, getEntriesForMonth, getDailyStats, getWeeklyStats, getHabitStats } from '@/lib/calculations';
 import { getDaysInMonth, getMonthName, formatDateKey } from '@/lib/date-utils';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, CartesianGrid, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, ReferenceLine, PieChart, Pie } from 'recharts';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TrendingUp, Target, Calendar, Award } from 'lucide-react';
@@ -23,6 +23,8 @@ export function AnalyticsView() {
   const heatmapData = dailyStats.map(d => ({
     day: d.day,
     percentage: Math.round(d.percentage * 100),
+    completed: d.completed,
+    total: d.total,
   }));
 
   // Habit breakdown for pie chart
@@ -48,6 +50,9 @@ export function AnalyticsView() {
   // Consistency score
   const daysWithActivity = dailyStats.filter(d => d.completed > 0).length;
   const consistency = daysInMonth > 0 ? daysWithActivity / daysInMonth : 0;
+  const avgDaily = dailyStats.length > 0
+    ? dailyStats.reduce((s, d) => s + d.percentage, 0) / dailyStats.length
+    : 0;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -59,6 +64,27 @@ export function AnalyticsView() {
       );
     }
     return null;
+  };
+
+  // Rich tooltip for the daily trend area chart
+  const TrendTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const d = payload[0].payload;
+    const pct = Math.round(d.percentage);
+    return (
+      <div className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 shadow-lg">
+        <p className="text-xs font-semibold text-gray-900 dark:text-white mb-1">Day {d.day}</p>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-gray-500">{d.completed}/{d.total} done</span>
+          <span className={cn(
+            'font-semibold',
+            pct >= 80 ? 'text-[#22C55E]' : pct >= 50 ? 'text-[#F59E0B]' : 'text-[#EF4444]'
+          )}>
+            {pct}%
+          </span>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -144,23 +170,36 @@ export function AnalyticsView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily trend */}
         <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-100 dark:border-gray-800 p-5">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Daily Trend</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Daily Trend</h3>
+            <span className="text-xs font-medium text-[#4F6BED] bg-[#EEF0FF] dark:bg-[#4F6BED]/20 px-2.5 py-1 rounded-full">
+              {Math.round(avgDaily) ?? 0}% avg
+            </span>
+          </div>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={heatmapData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Line
+              <AreaChart data={heatmapData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4F6BED" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#4F6BED" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                {/* Target line at 100% */}
+                <ReferenceLine y={100} stroke="#E5E7EB" strokeDasharray="4 4" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} interval={3} />
+                <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} domain={[0, 100]} ticks={[0, 50, 100]} />
+                <Tooltip content={<TrendTooltip />} cursor={{ stroke: '#4F6BED', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                <Area
                   type="monotone"
                   dataKey="percentage"
                   stroke="#4F6BED"
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: '#4F6BED' }}
-                  activeDot={{ r: 5 }}
+                  strokeWidth={2.5}
+                  fill="url(#trendFill)"
+                  dot={{ r: 3, fill: '#4F6BED', strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: '#4F6BED', stroke: '#fff', strokeWidth: 2 }}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
