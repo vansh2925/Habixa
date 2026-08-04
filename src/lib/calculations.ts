@@ -181,6 +181,11 @@ export function calculateOverallStreak(
 ): { current: number; longest: number; frozenUsed: number; hasFreeze: boolean } {
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
 
+  // Only consider days up to today (don't let future days break the streak).
+  const now = new Date();
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
+  const lastRelevantDay = isCurrentMonth ? Math.min(daysInMonth, now.getDate()) : daysInMonth;
+
   // Mark each day of the month as good (met goal) or miss
   const dayQualities: boolean[] = [];
   for (let day = 1; day <= daysInMonth; day++) {
@@ -202,11 +207,17 @@ export function calculateOverallStreak(
     return misses > freezePerWeek;
   };
 
-  // Current streak: walk backwards from the last day of the month
+  // Current streak: walk backwards from today.
+  // If today isn't a "good day" yet, start from yesterday so an
+  // un-finished today doesn't prematurely break the streak.
+  let start = lastRelevantDay - 1;
+  if (isCurrentMonth && start >= 0 && !dayQualities[start]) {
+    start = start - 1;
+  }
   let current = 0;
   let frozenUsed = 0;
   let broke = false;
-  for (let day = daysInMonth - 1; day >= 0 && !broke; day--) {
+  for (let day = start; day >= 0 && !broke; day--) {
     if (dayQualities[day]) {
       current++;
     } else if (!breaksStreak(day)) {
@@ -218,10 +229,10 @@ export function calculateOverallStreak(
     }
   }
 
-  // Longest streak: walk forward, applying the same freeze rule
+  // Longest streak: walk forward up to today, applying the same freeze rule
   let longest = 0;
   let run = 0;
-  for (let day = 0; day < daysInMonth; day++) {
+  for (let day = 0; day <= lastRelevantDay - 1; day++) {
     if (dayQualities[day]) {
       run++;
       longest = Math.max(longest, run);
@@ -249,9 +260,12 @@ export function calculateConsistency(
   streakGoal = 0.6
 ): { percentage: number; goodDays: number; totalDays: number } {
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
-  const goodDays: boolean[] = [];
+  const now = new Date();
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
+  const lastRelevantDay = isCurrentMonth ? Math.min(daysInMonth, now.getDate()) : daysInMonth;
 
-  for (let day = 1; day <= daysInMonth; day++) {
+  const goodDays: boolean[] = [];
+  for (let day = 1; day <= lastRelevantDay; day++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const dayEntries = entries.filter(e => e.date === dateStr);
     const completedCount = dayEntries.filter(e => e.completed).length;
@@ -278,8 +292,14 @@ export function calculatePerHabitStreaks(
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
   const result: Record<string, number> = {};
 
+  // Only consider days up to today (don't let future days break the streak).
+  const now = new Date();
+  const lastRelevantDay = (now.getFullYear() === year && now.getMonth() + 1 === month)
+    ? Math.min(daysInMonth, now.getDate())
+    : daysInMonth;
+
   for (const habit of activeHabits) {
-    // Build day-by-day completion for this habit
+    // Build day-by-day completion for this habit (index 0 = day 1)
     const dayDone: boolean[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -294,9 +314,17 @@ export function calculatePerHabitStreaks(
       return misses > freezePerWeek;
     };
 
-    // Current streak (from the end of the month backward)
+    // Current streak: count backward from the last relevant day.
+    // If viewing the current month and today isn't marked done yet,
+    // start from yesterday so an un-ticked "today" doesn't break the streak.
+    const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
+    let start = lastRelevantDay - 1;
+    if (isCurrentMonth && start >= 0 && !dayDone[start]) {
+      start = start - 1;
+    }
+
     let streak = 0;
-    for (let day = daysInMonth - 1; day >= 0; day--) {
+    for (let day = start; day >= 0; day--) {
       if (dayDone[day]) {
         streak++;
       } else if (!breaksStreak(day)) {
